@@ -2,6 +2,11 @@
  * 5대 떡상 카드뉴스 공식 기반 자동 대본 생성기 & 릴스 URL 역분석 엔진
  */
 
+function formatKstDate() {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}.${String(kst.getUTCMonth() + 1).padStart(2, '0')}.${String(kst.getUTCDate()).padStart(2, '0')}`;
+}
+
 // 5대 떡상 공식 템플릿 정의
 const VIRAL_FORMULAS = {
   warning: {
@@ -198,8 +203,14 @@ async function generateAdvancedCardScript({
       console.log(`[AI 대본 생성] 주제: '${topic}' | 관점: '${selectedMeta.name}' | 슬라이드 수: ${count}장`);
 
       const systemPrompt = `
-당신은 인스타그램에서 수십만 팔로워를 보유한 최정상급 카드뉴스 수석 에디터입니다.
+당신은 인스타그램에서 2839 세대(28~39세 수도권 월급쟁이·가구주)의 자산(부동산/재테크)과 권리(시사/정책) 생존 솔루션을 기획하는 수석 에디터입니다.
 주어진 주제, 원본 맥락(캡션, 음성 STT, 이미지 OCR 텍스트), 선택된 떡상 관점을 기반으로 총 ${count}장의 핀터레스트풍(1080x1350) 카드뉴스 대본을 JSON으로 작성해주세요.
+
+[🎯 2839 손실 회피(Loss Aversion) 원칙]
+- 독자가 겪을 수 있는 **'실질적 손실(자산 증발, 세금 폭탄, 보증금 미반환, 정책 변화로 인한 부담)'**을 직관적인 팩트와 수치로 경고하십시오.
+- **부동산:** 보증금 미반환, DSR 한도 축소, 청약 부적격 등 내 돈을 잃지 않는 명확한 방어 체크리스트 제시.
+- **재테크:** 숨은 세금·수수료, 연말정산 환급 누락, 연금 공백 등 '모르면 새는 돈'을 수치로 보여주고 절세 액션 제시.
+- **시사/정책:** 정파 논쟁이 아니라 **'내 지갑에 +인지 −인지'**로 번역. 시행일·대상·금액·신청 조건을 빠짐없이 정리하고, 모르면 손해인 조건을 경고.
 
 [🚨 정보 누락 제로 & 전수 수록 절대 원칙]
 - 원본 맥락에 구체적인 리스트 항목(예: '24가지 필수 확장팩', '10대 체크리스트', '8개 플러그인/8개 스킬/8개 MCP' 등)이 있는 경우:
@@ -209,8 +220,10 @@ async function generateAdvancedCardScript({
 
 [슬라이드 구조 규칙]
 - 슬라이드 1 (type: "cover"): 스크롤을 멈추게 하는 강력한 후킹 표지. tagline, headline_prefix, headline_highlight, headline_suffix, image_caption, swipe_text 작성.
-- 슬라이드 2 ~ ${count - 1} (type: "body_list" 또는 "body_visual"): 각 장마다 명확한 step_badge(예: "PART 01", "PLUGINS 02", "SKILLS 03", "MCP 04"), 제목(title), 그리고 핵심 포인트 목록(points: [{ number, heading, desc }]). 문장은 모바일에서 읽기 편하게 가독성 높게 작성.
-- 마지막 슬라이드 ${count} (type: "cta"): summary_title, summary_items (핵심 요약 3줄), action_title, action_desc, icons (예: ["게시물 저장하고 두고두고 보기", "필요한 동료에게 공유하기"]).
+- **표지 글자 수 제한 (디자인 깨짐 방지):** headline_prefix 14자 이내, headline_highlight 16자 이내, headline_suffix 14자 이내. 주제 문장을 통째로 넣지 말고 핵심 손실만 압축하십시오.
+- **본문 제목은 22자 이내**, point heading은 16자 이내로 작성하십시오.
+- 슬라이드 2 ~ ${count - 1} (type: "body_list" 또는 "body_visual"): 각 장마다 명확한 step_badge(예: "PART 01", "CHECK 02", "SOLUTION 03"), 제목(title), 그리고 핵심 포인트 목록(points: [{ number, heading, desc }]). 문장은 모바일에서 읽기 편하게 가독성 높게 작성.
+- 마지막 슬라이드 ${count} (type: "cta"): summary_title, summary_items (핵심 요약 3줄), action_title, action_desc, icons (예: ["게시물 저장하고 두고두고 보기", "필요한 지인에게 공유하기"]).
 
 다음 JSON 형식으로만 엄격하게 응답해주세요:
 {
@@ -268,7 +281,7 @@ async function generateAdvancedCardScript({
         return {
           project_title: `${topic} 카드뉴스`,
           category: parsed.category || "부동산 핫이슈 · 분석",
-          date: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').replace('.', ''),
+          date: formatKstDate(),
           author: {
             name: "@realestate_insights",
             avatar_letter: "R"
@@ -355,7 +368,7 @@ async function generateAdvancedCardScript({
   return {
     project_title: `${topic} 카드뉴스`,
     category: "부동산 핫이슈 · 분석",
-    date: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').replace('.', ''),
+    date: formatKstDate(),
     author: {
       name: "@realestate_insights",
       avatar_letter: "R"
@@ -379,7 +392,7 @@ function generateCardNewsScript(topic, summary, formulaType = 'warning', customD
   return {
     project_title: `${topic} 카드뉴스`,
     category: "부동산 핫이슈 · 분석",
-    date: new Date().toLocaleDateString('ko-KR').replace(/\. /g, '.').replace('.', ''),
+    date: formatKstDate(),
     author: {
       name: "@realestate_insights",
       avatar_letter: "R"

@@ -2,10 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const OpenAI = require('openai');
 const { fetchInstagramTopicTrends, fetchTargetAccountsReels, fetchSingleInstagramPost } = require('./collectors/apify_collector');
 const { fetchAutoRealEstateNews } = require('./collectors/estate_collector');
 const { generateCardNewsScript, generateAdvancedCardScript, analyzeReelsUrl } = require('./engine/analyzer');
 const { transcribeReelsAudio, analyzeCardImages, generateMultimodalInsight } = require('./engine/multimodal_analyzer');
+const { buildCardThemeVars } = require('./engine/card_theme');
+const { loadSettings, saveSettings } = require('./engine/settings_store');
 const { chromium } = require('playwright');
 
 const app = express();
@@ -17,6 +20,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/outputs', express.static(path.join(__dirname, 'outputs')));
 app.use('/assets', express.static(path.join(__dirname, 'assets')));
 app.use('/templates', express.static(path.join(__dirname, 'templates')));
+
+// 사용자 설정 영구 저장 (관점 선택 / 피드백 / 슬라이드 장수 / 카드 색상)
+app.get('/api/settings', (req, res) => {
+  res.json({ success: true, ...loadSettings() });
+});
+
+app.post('/api/settings', (req, res) => {
+  try {
+    const settings = saveSettings(req.body || {});
+    res.json({ success: true, settings });
+  } catch (err) {
+    console.error(`[설정 저장 오류]`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // 서버 단 동시 중복 요청 방지 락 (Task Locks)
 const serverLocks = {
@@ -69,7 +87,7 @@ app.post('/api/collect/accounts', async (req, res) => {
   }
 });
 
-// 3. [핫이슈 뉴스] 네이버 실시간 핫이슈 (부동산·정책·정치) 자동 수집 API
+// 3. [핫이슈 뉴스] 네이버 실시간 핫이슈 (부동산, 시사, 재테크) 자동 수집 + 손실회피 소재 TOP 5 선별 API
 app.post('/api/collect/estate', async (req, res) => {
   if (serverLocks.estate) {
     return res.status(429).json({ error: '이미 핫이슈 뉴스 수집 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.' });
@@ -77,9 +95,20 @@ app.post('/api/collect/estate', async (req, res) => {
   serverLocks.estate = true;
 
   try {
-    console.log(`[API] 네이버 실시간 핫이슈 뉴스(부동산·정치) 자동 수집 요청`);
-    const newsList = await fetchAutoRealEstateNews();
-    res.json({ success: true, count: newsList.length, data: newsList });
+    const { category } = req.body || {};
+    const targetCategory = category || 'all';
+    console.log(`[API] 네이버 실시간 핫이슈 뉴스 수집 요청 (카테고리: ${targetCategory})`);
+    const bundle = await fetchAutoRealEstateNews(targetCategory);
+    res.json({
+      success: true,
+      category: targetCategory,
+      count: bundle.items.length,
+      data: bundle.items,
+      topPicks: bundle.topPicks,
+      counts: bundle.counts,
+      policyCount: bundle.policyCount,
+      collectedAt: bundle.collectedAt
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   } finally {
@@ -225,7 +254,7 @@ app.post('/api/save-report', async (req, res) => {
     const upg = multimodalData?.upgradeStrategy || {};
     const angle = selectedAngle || {};
 
-    let mdContent = `# 📑 [인스타/부동산 트렌드 분석 & 카드뉴스 기획 리포트]
+    let mdContent = `# 📑 [3대 분야(부동산·시사·재테크) 트렌드 분석 & 카드뉴스 기획 리포트]
 > **생성 일시:** ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })} (KST)  
 > **저장 폴더:** \`outputs/${folderName}/\`
 
@@ -236,9 +265,10 @@ app.post('/api/save-report', async (req, res) => {
 - **원문 캡션:**  
   ${topicData.caption ? topicData.caption.replace(/\n/g, '\n  ') : '(캡션 없음)'}
 - **출처 / 계정:** ${topicData.source || '(미상)'}
-- **미디어 유형:** ${topicData.mediaType === 'reel' ? '🎬 인스타 릴스 영상' : topicData.mediaType === 'cardnews' ? '📑 카드뉴스 이미지' : '⚡ 부동산 팩트 브리핑'}
+- **미디어 유형:** ${topicData.mediaType === 'reel' ? '🎬 인스타 릴스 영상' : topicData.mediaType === 'cardnews' ? '📑 카드뉴스 이미지' : '⚡ 부동산·시사·재테크 팩트 브리핑'}
+- **손실회피 적합도:** ${typeof topicData.walletScore === 'number' ? `${topicData.walletScore}점 (${topicData.relevance || '참고'})` : '미산정'}
 - **성과 지표:** 좋아요 ${topicData.likesCount?.toLocaleString() || 0}개 / 조회수 ${topicData.viewsCount?.toLocaleString() || 0}회
-- **원본 바로가기:** [인스타그램 원본 링크](${topicData.url || '#'})
+- **원본 바로가기:** [원문 링크](${topicData.url || '#'})
 
 ---
 
@@ -318,9 +348,10 @@ ${(angle.storyline || []).map(s => `- **Slide ${s.slide} (${s.role}):** ${s.deta
       }
     });
 
-    // 2. 파일 저장 (report.md 단일 파일 저장)
+    // 2. 파일 저장 (report.md + script.json)
     const reportPath = path.join(targetDir, 'report.md');
     fs.writeFileSync(reportPath, mdContent, 'utf-8');
+    fs.writeFileSync(path.join(targetDir, 'script.json'), JSON.stringify(script, null, 2), 'utf-8');
 
     console.log(`[API] 자료수집 완료 및 리포트 저장 성공: ${reportPath}`);
 
@@ -337,16 +368,174 @@ ${(angle.storyline || []).map(s => `- **Slide ${s.slide} (${s.role}):** ${s.deta
   }
 });
 
-// 8. 카드뉴스 무손실 1080x1350 PNG 렌더링 API (기존 유지)
+// 7-1. AI 슬라이드 이미지 생성 API (OpenAI Images) — 표지/비주얼 슬라이드에 실제 사진 생성
+function getOpenAIClient() {
+  if (!process.env.OPENAI_API_KEY) return null;
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
+
+function buildSlideImagePrompt(slide, script) {
+  const theme = script.topic || script.project_title || slide.title || script.category || 'personal finance';
+  const scene = slide.image_caption || slide.title || 'A conceptual editorial visual';
+  return `${scene}. Theme: ${theme}. Editorial cinematic photograph for a Korean personal-finance card news cover, muted warm sand and deep charcoal palette, soft directional light, shallow depth of field, premium magazine aesthetic, vertical composition with breathing room, no text, no letters, no Korean characters, no logos, no watermark, no user interface.`;
+}
+
+async function createDryRunImage(filePath, slide) {
+  const label = String(slide.image_caption || slide.title || 'PREVIEW')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;');
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage({ viewport: { width: 1024, height: 1536 } });
+  await page.setContent(`
+    <html><body style="margin:0;width:1024px;height:1536px;display:flex;flex-direction:column;justify-content:flex-end;padding:64px;box-sizing:border-box;background:linear-gradient(140deg,#F1EDE4 0%,#D8CFC0 100%);font-family:sans-serif;">
+      <div style="font-size:22px;letter-spacing:.16em;color:#D9532F;font-weight:700;">DRY RUN · NO API CALL</div>
+      <div style="font-size:44px;line-height:1.3;color:#191A1E;font-weight:800;margin-top:18px;">${label}</div>
+    </body></html>
+  `);
+  await page.screenshot({ path: filePath });
+  await browser.close();
+}
+
+app.post('/api/generate-images', async (req, res) => {
+  const { script, folderName, dryRun } = req.body || {};
+  if (!script || !Array.isArray(script.slides)) {
+    return res.status(400).json({ error: '올바른 대본 데이터가 필요합니다.' });
+  }
+
+  const folder = folderName || getFormattedTimestampFolder();
+  const targetDir = path.join(__dirname, 'outputs', folder);
+  const assetsDir = path.join(targetDir, 'assets');
+  fs.mkdirSync(assetsDir, { recursive: true });
+
+  const visualSlides = script.slides.filter(s => s.type === 'cover' || s.type === 'body_visual');
+  if (visualSlides.length === 0) {
+    return res.json({ success: true, folder, generated: [], script, message: '이미지가 들어가는 슬라이드가 없습니다.' });
+  }
+
+  const isDryRun = dryRun === true || process.env.IMAGE_DRY_RUN === '1';
+  const openai = isDryRun ? null : getOpenAIClient();
+  if (!isDryRun && !openai) {
+    return res.status(400).json({ error: 'OPENAI_API_KEY가 설정되어 있지 않습니다.' });
+  }
+
+  const generated = [];
+  const errors = [];
+
+  for (const [idx, slide] of visualSlides.entries()) {
+    const number = slide.slide_number || idx + 1;
+    const pad = String(number).padStart(2, '0');
+    const filePath = path.join(assetsDir, `slide_${pad}.png`);
+
+    try {
+      if (isDryRun) {
+        await createDryRunImage(filePath, slide);
+      } else {
+        const prompt = buildSlideImagePrompt(slide, script);
+        let b64 = null;
+        const modelErrors = [];
+        const models = (process.env.IMAGE_MODELS || 'gpt-image-2,chatgpt-image-latest,gpt-image-1-mini,gpt-image-1')
+          .split(',').map(m => m.trim()).filter(Boolean);
+
+        for (const model of models) {
+          try {
+            const result = await openai.images.generate({
+              model,
+              prompt,
+              size: '1024x1536',
+              quality: 'medium',
+              n: 1
+            }, { timeout: 180000 });
+
+            const item = result.data?.[0];
+            if (item?.b64_json) {
+              b64 = item.b64_json;
+              break;
+            }
+            if (item?.url) {
+              const imgRes = await fetch(item.url);
+              const buf = Buffer.from(await imgRes.arrayBuffer());
+              b64 = buf.toString('base64');
+              break;
+            }
+            throw new Error('이미지 데이터가 비어 있습니다.');
+          } catch (modelErr) {
+            modelErrors.push(`${model}: ${modelErr.message}`);
+            console.warn(`[이미지] ${model} 실패: ${modelErr.message}`);
+          }
+        }
+
+        if (!b64) throw new Error(modelErrors.join(' | ') || '이미지 생성에 실패했습니다.');
+        fs.writeFileSync(filePath, Buffer.from(b64, 'base64'));
+      }
+
+      slide.image_path = `outputs/${folder}/assets/slide_${pad}.png`;
+      generated.push({ slide_number: number, path: `/outputs/${folder}/assets/slide_${pad}.png` });
+    } catch (err) {
+      console.error(`[이미지] slide ${number} 생성 실패:`, err.message);
+      errors.push({ slide_number: number, error: err.message });
+    }
+  }
+
+  fs.writeFileSync(path.join(targetDir, 'script.json'), JSON.stringify(script, null, 2), 'utf-8');
+
+  if (generated.length === 0) {
+    return res.status(500).json({ error: errors[0]?.error || '이미지 생성에 실패했습니다.', errors });
+  }
+
+  res.json({ success: true, folder, generated, script, errors });
+});
+
+// 8. 카드뉴스 무손실 1080x1350 PNG 렌더링 API
+function formatCardDate(value) {
+  if (typeof value === 'string') {
+    const match = value.match(/(20\d{2})\D{0,2}(\d{1,2})\D{0,2}(\d{1,2})/);
+    if (match) {
+      return `${match[1]}.${String(match[2]).padStart(2, '0')}.${String(match[3]).padStart(2, '0')}`;
+    }
+    const digits = value.replace(/\D/g, '');
+    if (digits.length === 8) {
+      return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
+    }
+  }
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}.${String(kst.getUTCMonth() + 1).padStart(2, '0')}.${String(kst.getUTCDate()).padStart(2, '0')}`;
+}
+
+function resolveSlideImage(slide, outputDir) {
+  const assetsDir = path.join(outputDir, 'assets');
+  const candidates = [];
+
+  if (slide.image_path) {
+    if (/^https?:\/\//.test(slide.image_path)) return slide.image_path;
+    candidates.push(path.isAbsolute(slide.image_path) ? slide.image_path : path.join(__dirname, slide.image_path));
+  }
+
+  const n = slide.slide_number;
+  const pad = String(n).padStart(2, '0');
+  const names = n === 1
+    ? ['cover.jpg', 'cover.png', `slide1.jpg`, `slide1.png`, `slide_${pad}.jpg`, `slide_${pad}.png`]
+    : [`slide${n}.jpg`, `slide${n}.png`, `slide_${pad}.jpg`, `slide_${pad}.png`];
+
+  for (const name of names) candidates.push(path.join(assetsDir, name));
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return `file://${candidate.replace(/\\/g, '/')}`;
+  }
+  return '';
+}
+
 app.post('/api/render', async (req, res) => {
-  const { script, folderName: customFolder } = req.body;
+  const { script, folderName: customFolder, theme } = req.body;
   if (!script || !script.slides) {
     return res.status(400).json({ error: '올바른 대본 데이터가 필요합니다.' });
   }
 
+  const themeVars = buildCardThemeVars(theme);
+
   const folderName = customFolder || getFormattedTimestampFolder();
   const targetOutputDir = path.join(__dirname, 'outputs', folderName);
-  fs.mkdirSync(targetOutputDir, { recursive: true });
+  const cardsDir = path.join(targetOutputDir, 'cards');
+  fs.mkdirSync(path.join(targetOutputDir, 'assets'), { recursive: true });
+  fs.mkdirSync(cardsDir, { recursive: true });
 
   const templatePath = path.resolve(__dirname, 'templates/card_template.html');
   const browser = await chromium.launch({ headless: true });
@@ -357,19 +546,38 @@ app.post('/api/render', async (req, res) => {
   const page = await context.newPage();
 
   const generatedImages = [];
+  const cardDate = formatCardDate(script.date);
 
-  for (const slide of script.slides) {
-    const pageNum = String(slide.slide_number).padStart(2, '0');
-    const totalPages = String(slide.total_slides).padStart(2, '0');
+  for (const [idx, slide] of script.slides.entries()) {
+    const slideNumber = slide.slide_number || idx + 1;
+    const pageNum = String(slideNumber).padStart(2, '0');
+    const totalPages = String(script.slides.length).padStart(2, '0');
+    const slideForRender = { ...slide, slide_number: slideNumber, total_slides: script.slides.length, render_image: resolveSlideImage({ ...slide, slide_number: slideNumber }, targetOutputDir) };
 
     await page.goto(`file://${templatePath}`);
 
-    await page.evaluate(({ data, slide, pageNum, totalPages }) => {
-      document.getElementById('category-text').innerText = data.category || '부동산 핫이슈';
-      document.getElementById('date-text').innerText = data.date || '2026.09.21';
-      document.getElementById('handle-text').innerText = data.author?.name || '@realestate_insights';
-      document.getElementById('avatar-text').innerText = data.author?.avatar_letter || 'R';
+    await page.evaluate(({ data, slide, pageNum, totalPages, themeVars, cardDate }) => {
+      Object.entries(themeVars || {}).forEach(([key, value]) => {
+        document.documentElement.style.setProperty(key, value);
+      });
+
+      document.getElementById('category-text').innerText = data.category || '부동산 · 시사 · 재테크';
+      document.getElementById('date-text').innerText = cardDate;
+      document.getElementById('handle-text').innerText = data.author?.name || '@2839.studio';
+      document.getElementById('avatar-text').innerText = data.author?.avatar_letter || '2';
       document.getElementById('page-text').innerText = `${pageNum} / ${totalPages}`;
+
+      const visualInner = slide.render_image
+        ? `<img src="${slide.render_image}" alt="Visual">`
+        : `<div class="visual-placeholder">
+             <div class="vp-tag">${slide.step_badge || (slide.type === 'cover' ? 'KEY VISUAL' : 'DATA POINT')}</div>
+             <div class="vp-text">${slide.image_caption || slide.title || ''}</div>
+           </div>`;
+
+      const coverLen = `${slide.headline_prefix || ''}${slide.headline_highlight || ''}${slide.headline_suffix || ''}`.length;
+      const coverSize = coverLen > 44 ? 46 : coverLen > 32 ? 54 : 64;
+      const titleLen = (slide.title || '').length;
+      const bodyTitleSize = titleLen > 28 ? 38 : titleLen > 20 ? 43 : 48;
 
       const container = document.getElementById('slide-content-container');
       container.innerHTML = '';
@@ -378,15 +586,15 @@ app.post('/api/render', async (req, res) => {
         container.innerHTML = `
           <div class="content-cover">
             <div class="cover-tagline">${slide.tagline || ''}</div>
-            <h1 class="cover-headline">
+            <h1 class="cover-headline" style="font-size: ${coverSize}px;">
               ${slide.headline_prefix || ''} <br>
               <span class="highlight">${slide.headline_highlight || ''}</span> ${slide.headline_suffix || ''}
             </h1>
             <div class="cover-visual-card">
-              <img src="${slide.image_path}" alt="Cover Visual">
-              <div class="cover-visual-overlay">
+              ${visualInner}
+              ${slide.render_image ? `<div class="cover-visual-overlay">
                 <div class="cover-visual-caption">${slide.image_caption || ''}</div>
-              </div>
+              </div>` : ''}
             </div>
             <div class="swipe-hint">
               <span>${slide.swipe_text || '밀어서 계속 보기'}</span>
@@ -395,7 +603,8 @@ app.post('/api/render', async (req, res) => {
           </div>
         `;
       } else if (slide.type === 'body_list') {
-        const pointsHtml = slide.points.map(p => `
+        const points = Array.isArray(slide.points) ? slide.points : [];
+        const pointsHtml = points.map(p => `
           <div class="point-card">
             <div class="point-number">${p.number}</div>
             <div class="point-content">
@@ -409,7 +618,7 @@ app.post('/api/render', async (req, res) => {
           <div class="content-body">
             <div class="body-title-wrap">
               <div class="body-step-badge">${slide.step_badge || 'SUMMARY'}</div>
-              <h2 class="body-title">${slide.title}</h2>
+              <h2 class="body-title" style="font-size: ${bodyTitleSize}px;">${slide.title}</h2>
             </div>
             <div class="point-cards-list">
               ${pointsHtml}
@@ -417,7 +626,8 @@ app.post('/api/render', async (req, res) => {
           </div>
         `;
       } else if (slide.type === 'body_visual') {
-        const pointsHtml = slide.points ? slide.points.map(p => `
+        const points = Array.isArray(slide.points) ? slide.points : [];
+        const pointsHtml = points.map(p => `
           <div class="point-card" style="padding: 22px 28px;">
             <div class="point-number" style="background: var(--accent-blue-soft); color: var(--accent-blue);">${p.number}</div>
             <div class="point-content">
@@ -425,16 +635,16 @@ app.post('/api/render', async (req, res) => {
               <div class="point-desc" style="font-size: 22px;">${p.desc}</div>
             </div>
           </div>
-        `).join('') : '';
+        `).join('');
 
         container.innerHTML = `
           <div class="content-body">
             <div class="body-title-wrap">
               <div class="body-step-badge">${slide.step_badge || 'ACTION'}</div>
-              <h2 class="body-title">${slide.title}</h2>
+              <h2 class="body-title" style="font-size: ${bodyTitleSize}px;">${slide.title}</h2>
             </div>
             <div class="cover-visual-card" style="height: 380px;">
-              <img src="${slide.image_path}" alt="Visual">
+              ${visualInner}
             </div>
             <div class="point-cards-list">
               ${pointsHtml}
@@ -442,8 +652,17 @@ app.post('/api/render', async (req, res) => {
           </div>
         `;
       } else if (slide.type === 'cta') {
-        const listHtml = slide.summary_items.map(item => `<li>${item}</li>`).join('');
-        const iconsHtml = slide.icons.map(icon => `<div class="cta-icon-item">💾 ${icon}</div>`).join('');
+        const summaryItems = Array.isArray(slide.summary_items) ? slide.summary_items : [];
+        const icons = Array.isArray(slide.icons) ? slide.icons : ['게시물 저장하기', '지인에게 공유하기'];
+        const pickIcon = (label) => {
+          if (/공유|태그|보내|전송|링크/.test(label)) return '📤';
+          if (/저장|소장|북마크|보관/.test(label)) return '💾';
+          if (/팔로우|구독/.test(label)) return '➕';
+          if (/댓글|의견/.test(label)) return '💬';
+          return '✅';
+        };
+        const listHtml = summaryItems.map(item => `<li>${item}</li>`).join('');
+        const iconsHtml = icons.map(icon => `<div class="cta-icon-item">${pickIcon(icon)} ${icon}</div>`).join('');
 
         container.innerHTML = `
           <div class="content-cta">
@@ -463,15 +682,15 @@ app.post('/api/render', async (req, res) => {
           </div>
         `;
       }
-    }, { data: script, slide, pageNum, totalPages });
+    }, { data: script, slide: slideForRender, pageNum, totalPages, themeVars, cardDate });
 
     await page.waitForTimeout(400);
 
     const filename = `slide_${pageNum}.png`;
-    const outputFilePath = path.join(targetOutputDir, filename);
+    const outputFilePath = path.join(cardsDir, filename);
     await page.screenshot({ path: outputFilePath, clip: { x: 0, y: 0, width: 1080, height: 1350 } });
 
-    generatedImages.push(`/outputs/${folderName}/${filename}`);
+    generatedImages.push(`/outputs/${folderName}/cards/${filename}`);
   }
 
   await browser.close();

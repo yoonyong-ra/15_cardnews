@@ -578,3 +578,253 @@ body {
   height: 100%;
   object-fit: cover;
 }
+
+/* 2839 Loss Aversion Presets & Category Chips */
+.preset-tag-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #D1D5DB;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  letter-spacing: -0.01em;
+}
+
+.preset-tag-btn:hover {
+  background: rgba(217, 83, 47, 0.2);
+  border-color: var(--accent-orange);
+  color: #FFF;
+  transform: translateY(-1px);
+}
+
+.news-category-btn {
+  transition: all 0.2s ease;
+}
+
+.news-category-btn:hover {
+  filter: brightness(1.2);
+  transform: translateY(-1px);
+}
+
+.news-category-btn.active {
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+  border-color: #FFF !important;
+}
+
+/* 오늘의 카드뉴스 소재 TOP 5 (손실회피 적합도 순) */
+.top-picks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.top-pick-card {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  background: linear-gradient(135deg, rgba(217, 83, 47, 0.1) 0%, var(--bg-surface) 55%);
+  border: 1px solid rgba(217, 83, 47, 0.28);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.top-pick-card:hover {
+  border-color: var(--accent-orange);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.top-pick-rank {
+  font-family: var(--font-accent);
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--accent-orange);
+  min-width: 22px;
+  line-height: 1.1;
+}
+
+.top-pick-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.top-pick-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+
+.top-pick-field {
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.07);
+  color: #E5E7EB;
+}
+
+.top-pick-field.field-estate { background: rgba(96, 165, 250, 0.14); color: #60A5FA; }
+.top-pick-field.field-politics { background: rgba(248, 113, 113, 0.14); color: #F87171; }
+.top-pick-field.field-finance { background: rgba(52, 211, 153, 0.14); color: #34D399; }
+
+.top-pick-angle {
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.top-pick-score {
+  margin-left: auto;
+  color: #F87171;
+  font-weight: 900;
+  font-size: 11px;
+}
+
+.top-pick-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--text-main);
+  word-break: keep-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.top-pick-sub {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+
+/* 렌더링된 카드뉴스 갤러리 */
+#cards-gallery {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.card-thumb {
+  display: block;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-surface-elevated);
+  text-decoration: none;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.card-thumb:hover {
+  border-color: var(--accent-orange);
+  transform: translateY(-2px);
+}
+
+.card-thumb img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1080 / 1350;
+  object-fit: cover;
+}
+
+.card-thumb span {
+  display: block;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 생성된 슬라이드 이미지 미리보기 */
+#images-preview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+#images-preview img {
+  aspect-ratio: 1024 / 1536;
+}
+
+/* Card theme controls */
+.theme-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.theme-field input[type="color"] {
+  width: 100%;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.theme-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.theme-preset {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.18s ease;
+}
+
+.theme-preset:hover {
+  border-color: var(--accent-orange);
+}
+
+/* Best TOP 5 일괄 선택 */
+.batch-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.batch-select-all input,
+.batch-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--accent-orange);
+  cursor: pointer;
+}
+
+.batch-check {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 2px;
+}
+
+.feed-card.batch-selected {
+  border-color: #7C3AED !important;
+  box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.55), 0 8px 24px rgba(0, 0, 0, 0.35);
+}

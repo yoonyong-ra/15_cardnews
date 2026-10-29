@@ -26,5 +26,6 @@ assets/dashboard_*.png
 
 # System Generated / Temporary
 .system_generated/
+data/
 tmp/
 scratch/

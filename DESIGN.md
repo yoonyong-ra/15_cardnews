@@ -75,21 +75,25 @@
 
 카드뉴스의 모든 슬라이드는 텍스트와 1:1로 결합된 고유의 시각 이미지를 포함합니다. Antigravity의 자체 이미지 생성 역량을 활용하여 슬라이드의 맥락과 감정에 맞는 이미지를 자동 생성합니다.
 
-### 이미지 생성 & 매칭 규칙
+### 이미지 생성 & 매칭 규칙 (3대 분야 손실회피 특화)
 1. **표지 (Cover Slide):**
-   - **프롬프트 전략:** 주제의 핵심 욕망/불안을 대변하는 웅장하고 미니멀한 메인 비주얼.
-   - **예시:** `"A cinematic, modern architectural Korean luxury apartment building at twilight, moody dramatic lighting, 8k, minimal aesthetic"`
+   - **프롬프트 전략:** 주제의 핵심 불안 및 손실을 대변하는 웅장하고 미니멀한 시네마틱 비주얼.
+   - **부동산 예시:** `"A cinematic, modern architectural Korean luxury apartment building at twilight, moody dramatic lighting, 8k, minimal aesthetic"`
+   - **재테크 예시:** `"A sleek modern stock market chart display in a dark room, glowing amber and red lines showing financial volatility, moody cinematic lighting"`
+   - **시사 예시:** `"A dramatic low-angle shot of the Korean National Assembly building at dusk with a stack of policy documents in the foreground, cinematic lighting, muted tones"`
 2. **문제 제기 & 리스크 (Problem / Risk):**
-   - **프롬프트 전략:** 긴장감 있는 포커스 샷, 계약서, 계산기, 고민하는 실루엣.
-   - **예시:** `"A person reviewing a real estate contract with a calculator, soft moody indoor lighting, shallow depth of field"`
+   - **프롬프트 전략:** 긴장감 있는 포커스 샷, 계약서, 계산기, 고지서, 고민하는 실루엣.
+   - **부동산/재테크 예시:** `"A person reviewing a financial contract with a calculator, soft moody indoor lighting, shallow depth of field"`
+   - **시사 예시:** `"Close-up of a utility bill and tax notice on a dark wooden desk, red overdue stamp, moody lighting, shallow depth of field"`
 3. **데이터 & 팩트 비교 (Comparison / Fact):**
-   - **프롬프트 전략:** 도시 전경의 대비, 3D 차트 또는 대조되는 건축물.
-   - **예시:** `"Split comparison visual between two modern cityscapes, minimalist architectural photography"`
+   - **프롬프트 전략:** 대비되는 비주얼, 3D 차트 또는 제도 변경 전후 부담금 비교.
+   - **예시:** `"Split comparison visual of before-and-after household budget charts, minimalist 3D infographic style, dark background"`
 4. **해결책 & 치트키 (Solution / Checklist):**
-   - **프롬프트 전략:** 밝고 정돈된 모던 데스크, 체크리스트, 성공적인 분위기.
-   - **예시:** `"A clean modern minimalist workspace with notebook, pen, and coffee, warm morning sunlight"`
+   - **프롬프트 전략:** 밝고 정돈된 모던 데스크, 체크리스트, 신청 서류, 성공적인 분위기.
+   - **예시:** `"A clean modern minimalist workspace with a checklist, pen, and coffee, warm morning sunlight"`
 5. **엔딩 & CTA (Summary / Action):**
    - **프롬프트 전략:** 스마트폰 화면의 북마크/공유, 감성적인 공간 샷.
+   - **예시:** `"Minimalist aesthetic desk with smartphone displaying bookmark icon, warm ambient coffee shop atmosphere"`
 
 ---
 

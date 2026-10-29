@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RealEstate CardNews Studio — 카드뉴스 자동화 스튜디오</title>
+  <title>2839 CardNews Studio — 부동산 · 시사 · 재테크 손실회피 카드뉴스 스튜디오</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,13 +15,13 @@
         <img src="/logo.png" alt="남다른AI Logo">
       </div>
       <div class="logo-title" style="display: flex; align-items: baseline; gap: 8px;">
-        <span class="title-white">CARD NEWS</span>
+        <span class="title-white">2839</span>
         <span class="title-orange">STUDIO</span>
-        <span class="made-by-badge" style="font-size: 11px; font-weight: 600; color: #9CA3AF; background: rgba(255, 255, 255, 0.06); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1); letter-spacing: -0.01em;">made by 남다른AI</span>
+        <span class="made-by-badge" style="font-size: 11px; font-weight: 600; color: #9CA3AF; background: rgba(255, 255, 255, 0.06); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1); letter-spacing: -0.01em;">부동산 · 시사 · 재테크</span>
       </div>
     </div>
     <div style="font-size: 13px; color: var(--text-muted);">
-      인스타 핫트렌드 & 공공·민간 부동산 팩트 기반 핀터레스트 카드뉴스 자동 제작기
+      2839 세대 자산·권리 손실회피 특화 핀터레스트 카드뉴스 자동 제작기
     </div>
   </header>
 
@@ -31,20 +31,49 @@
     <!-- Left Main: Feed Tabs & Tools -->
     <main class="main-content">
       <nav class="tab-bar">
-        <button class="tab-btn active" data-tab="tab-topic">🔥 1. 주제별 핫트렌드 20개 (베스트 5개 집중)</button>
-        <button class="tab-btn" data-tab="tab-account">👥 2. 특정 릴스 계정 전수 수집 (전날 0시~현재)</button>
-        <button class="tab-btn" data-tab="tab-estate">📰 3. 핫이슈 뉴스 자동 수집 (부동산·정치)</button>
+        <button class="tab-btn active" data-tab="tab-topic">🔥 1. 3대 분야 핫트렌드 (베스트 5픽)</button>
+        <button class="tab-btn" data-tab="tab-account">👥 2. 특정 릴스 계정 전수 수집</button>
+        <button class="tab-btn" data-tab="tab-estate">📰 3. 실시간 뉴스 (부동산·시사·재테크)</button>
         <button class="tab-btn" data-tab="tab-reels">🔍 4. 릴스 URL 떡상 역분석</button>
       </nav>
 
       <!-- TAB 1: Topic-based Instagram Trends (20 Posts + Best 5 Highlighting) -->
       <section class="tab-content" id="tab-topic">
         <div class="control-panel">
-          <div style="font-weight: 700; font-size: 14px; color: var(--text-main);">
-            🔍 관심 주제 입력 (어제 0시 ~ 현재 20개 수집 ➔ 좋아요 순 <span style="color: var(--accent-orange);">베스트 TOP 5</span> 자동 선별)
+          <div style="font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 8px;">
+            🔍 2839 손실회피 추천 키워드 (클릭 시 자동 입력)
           </div>
+          
+          <!-- Category Keyword Chips -->
+          <div class="quick-presets-container" style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 12px;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-weight: 800; color: #60A5FA; min-width: 65px;">🏠 부동산:</span>
+              <button type="button" class="preset-tag-btn" data-keyword="청약">#청약</button>
+              <button type="button" class="preset-tag-btn" data-keyword="부동산">#부동산</button>
+              <button type="button" class="preset-tag-btn" data-keyword="전세사기">#전세사기</button>
+              <button type="button" class="preset-tag-btn" data-keyword="내집마련">#내집마련</button>
+              <button type="button" class="preset-tag-btn" data-keyword="DSR대출">#DSR대출</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-weight: 800; color: #34D399; min-width: 65px;">💰 재테크:</span>
+              <button type="button" class="preset-tag-btn" data-keyword="절세">#절세</button>
+              <button type="button" class="preset-tag-btn" data-keyword="연말정산">#연말정산</button>
+              <button type="button" class="preset-tag-btn" data-keyword="파킹통장">#파킹통장</button>
+              <button type="button" class="preset-tag-btn" data-keyword="ISA계좌">#ISA계좌</button>
+              <button type="button" class="preset-tag-btn" data-keyword="숨은돈찾기">#숨은돈찾기</button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-weight: 800; color: #F87171; min-width: 65px;">🏛️ 시사:</span>
+              <button type="button" class="preset-tag-btn" data-keyword="세제개편">#세제개편</button>
+              <button type="button" class="preset-tag-btn" data-keyword="부동산정책">#부동산정책</button>
+              <button type="button" class="preset-tag-btn" data-keyword="연금개혁">#연금개혁</button>
+              <button type="button" class="preset-tag-btn" data-keyword="최저임금">#최저임금</button>
+              <button type="button" class="preset-tag-btn" data-keyword="청년지원금">#청년지원금</button>
+            </div>
+          </div>
+
           <div class="input-row">
-            <input type="text" class="custom-input" id="topic-keyword-input" placeholder="관심 있는 키워드를 입력하세요 (예: 청약, 부동산, 세무, AI 등)" value="">
+            <input type="text" class="custom-input" id="topic-keyword-input" placeholder="키워드를 입력하거나 위 태그를 클릭하세요" value="청약">
             <button class="action-collect-btn" id="btn-collect-topic">
               <span>🔥</span> 20개 수집 및 베스트 5 선별
             </button>
@@ -53,9 +82,26 @@
 
         <!-- Best 5 Section -->
         <div id="best-5-section" style="margin-top: 20px; display: none;">
-          <div style="font-size: 15px; font-weight: 800; color: var(--accent-orange); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
-            <span>👑</span> 어제 0시~현재 좋아요 폭발 [베스트 TOP 5 픽]
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+            <div style="font-size: 15px; font-weight: 800; color: var(--accent-orange); display: flex; align-items: center; gap: 6px;">
+              <span>👑</span> 어제 0시~현재 좋아요 폭발 [베스트 TOP 5 픽]
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <label class="batch-select-all">
+                <input type="checkbox" id="best-select-all"> 전체선택
+              </label>
+              <button class="action-collect-btn" id="btn-batch-generate" style="padding: 7px 14px; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);" disabled>
+                <span>⚡</span> 선택 0개 일괄생성
+              </button>
+            </div>
           </div>
+
+          <!-- Batch progress -->
+          <div id="batch-progress" style="display: none; margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: 10px; background: rgba(79, 70, 229, 0.08);">
+            <div id="batch-progress-head" style="font-size: 12px; font-weight: 800; color: #A5B4FC; margin-bottom: 8px;"></div>
+            <div id="batch-log" style="display: flex; flex-direction: column; gap: 5px; max-height: 180px; overflow-y: auto; font-size: 11px; line-height: 1.4;"></div>
+          </div>
+
           <div class="cards-grid" id="best5-cards-container"></div>
         </div>
 
@@ -84,22 +130,38 @@
         <div class="cards-grid" id="accounts-cards-container" style="margin-top: 16px;"></div>
       </section>
 
-      <!-- TAB 3: Hot Issue Breaking News (Real Estate & Politics) -->
+      <!-- TAB 3: Hot Issue Breaking News (Real Estate, Finance, Sports) -->
       <section class="tab-content" id="tab-estate" style="display: none;">
         <div class="control-panel">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
             <div>
               <div style="font-weight: 800; font-size: 15px; color: var(--text-main);">
-                📰 네이버 실시간 핫이슈 뉴스 자동 모니터링
+                📰 네이버 실시간 핫이슈 뉴스 (부동산 · 시사 · 재테크)
               </div>
               <div style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-                부동산·정책·경제·정치 실시간 주요 핫이슈 & 헤드라인 속보 수집
+                2839 타깃 손실회피 및 주요 리스크 속보 자동 모니터링 · 시사는 '내 지갑에 닿는 정책'만 노출
               </div>
             </div>
-            <button class="action-collect-btn" id="btn-collect-estate" style="background: var(--accent-green); padding: 12px 24px;">
-              <span>⚡</span> 최신 핫이슈 자동 수집
-            </button>
+            
+            <!-- Category Filter Buttons -->
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button class="news-category-btn active" data-cat="all" style="padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.1); color: #fff; cursor: pointer;">⚡ 전체</button>
+              <button class="news-category-btn" data-cat="estate" style="padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px; border: 1px solid rgba(96,165,250,0.3); background: rgba(96,165,250,0.1); color: #60A5FA; cursor: pointer;">🏠 부동산</button>
+              <button class="news-category-btn" data-cat="politics" style="padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px; border: 1px solid rgba(248,113,113,0.3); background: rgba(248,113,113,0.1); color: #F87171; cursor: pointer;">🏛️ 시사</button>
+              <button class="news-category-btn" data-cat="finance" style="padding: 6px 12px; font-size: 12px; font-weight: 700; border-radius: 6px; border: 1px solid rgba(52,211,153,0.3); background: rgba(52,211,153,0.1); color: #34D399; cursor: pointer;">💰 재테크</button>
+              <button class="action-collect-btn" id="btn-collect-estate" style="background: var(--accent-green); padding: 8px 16px; margin-left: 6px;">
+                <span>⚡</span> 속보 수집
+              </button>
+            </div>
           </div>
+        </div>
+        <!-- Today's TOP 5 Loss-Aversion Picks -->
+        <div id="top-picks-section" style="display: none; margin-top: 16px;">
+          <div style="font-size: 14px; font-weight: 800; color: var(--accent-orange); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+            <span>🔥</span> 오늘의 카드뉴스 소재 TOP 5
+            <span id="top-picks-meta" style="font-size: 11px; font-weight: 600; color: var(--text-muted);"></span>
+          </div>
+          <div id="top-picks-container" class="top-picks-list"></div>
         </div>
         <div class="cards-grid" id="estate-cards-container" style="margin-top: 16px;"></div>
       </section>
@@ -199,9 +261,48 @@
 
       <!-- Step 4: Data Collection Finish & Report Markdown Save -->
       <div class="studio-section" id="section-render" style="display: none;">
+        <!-- Card Theme Settings -->
+        <div style="margin-bottom: 12px; padding: 12px; border: 1px solid var(--border-subtle); border-radius: 10px; background: rgba(255,255,255,0.03);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <span style="font-size: 13px; font-weight: 800; color: var(--text-main);">🎨 카드 색상</span>
+            <button type="button" id="btn-reset-theme" style="font-size: 11px; font-weight: 700; color: var(--text-muted); background: transparent; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 3px 8px; cursor: pointer;">기본값</button>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px;">
+            <label class="theme-field">배경색
+              <input type="color" id="theme-bg" value="#F7F5F0">
+            </label>
+            <label class="theme-field">타이틀색
+              <input type="color" id="theme-title" value="#191A1E">
+            </label>
+            <label class="theme-field">강조색
+              <input type="color" id="theme-accent" value="#D9532F">
+            </label>
+          </div>
+          <div class="theme-presets">
+            <button type="button" class="theme-preset" data-bg="#1B1B1E" data-title="#F5F3EF" data-accent="#FF5A36">다크</button>
+            <button type="button" class="theme-preset" data-bg="#F7F5F0" data-title="#191A1E" data-accent="#D9532F">웜 샌드</button>
+            <button type="button" class="theme-preset" data-bg="#0F172A" data-title="#E2E8F0" data-accent="#38BDF8">미드나잇</button>
+            <button type="button" class="theme-preset" data-bg="#FFF8F0" data-title="#2B2118" data-accent="#E07A5F">크림</button>
+          </div>
+          <div id="theme-contrast-warning" style="display: none; margin-top: 8px; font-size: 11px; font-weight: 700; color: #FBBF24;">⚠️ 타이틀색과 배경색 대비가 낮아 가독성이 떨어질 수 있습니다.</div>
+        </div>
+
         <button class="generate-btn" id="btn-save-report" style="width: 100%; background: linear-gradient(135deg, #059669 0%, #10B981 100%); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);">
           <span>📁</span> 자료수집 완료 및 종합 리포트 저장
         </button>
+
+        <button class="generate-btn" id="btn-generate-images" style="width: 100%; margin-top: 10px; background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%); box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);">
+          <span>🖼️</span> AI 슬라이드 이미지 생성 (표지·비주얼)
+        </button>
+
+        <div id="images-preview" style="display: none;"></div>
+
+        <button class="generate-btn" id="btn-render-cards" style="width: 100%; margin-top: 10px; background: linear-gradient(135deg, #D9532F 0%, #F59E0B 100%); box-shadow: 0 4px 14px rgba(217, 83, 47, 0.3);">
+          <span>🎨</span> 카드뉴스 PNG 4장 생성 (1080x1350)
+        </button>
+
+        <!-- Rendered Cards Gallery -->
+        <div id="cards-gallery" style="display: none;"></div>
 
         <!-- Report Saved Result Zone -->
         <div class="result-zone" id="result-zone" style="display: none; margin-top: 14px; flex-direction: column; gap: 10px; background: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-green); padding: 16px; border-radius: 12px;">

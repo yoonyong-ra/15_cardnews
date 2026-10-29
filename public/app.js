@@ -5,11 +5,18 @@ let topicPosts = [];
 let best5Posts = [];
 let accountPosts = [];
 let estateNewsList = [];
+let selectedBestIds = new Set();
+let isBatchRunning = false;
 
 // DOM Elements
 const topicContainer = document.getElementById('topic-cards-container');
 const best5Container = document.getElementById('best5-cards-container');
 const best5Section = document.getElementById('best-5-section');
+const bestSelectAll = document.getElementById('best-select-all');
+const btnBatchGenerate = document.getElementById('btn-batch-generate');
+const batchProgress = document.getElementById('batch-progress');
+const batchProgressHead = document.getElementById('batch-progress-head');
+const batchLog = document.getElementById('batch-log');
 const accountsContainer = document.getElementById('accounts-cards-container');
 const estateContainer = document.getElementById('estate-cards-container');
 const selectedTopicBox = document.getElementById('selected-topic-box');
@@ -70,7 +77,7 @@ function startCooldown(btn, originalHtml, cooldownSec = 3) {
  * 피드 카드 제목 정제 (첫 2~3문장 추출, 잡다한 해시태그 정리하여 깔끔하게 표시)
  */
 function cleanDisplayTitle(caption = '') {
-  if (!caption) return '최신 부동산/재테크 트렌드';
+  if (!caption) return '최신 3대 분야 트렌드';
   // 해시태그 제거 및 줄바꿈 정리
   const cleaned = caption
     .replace(/#[^\s#]+/g, '')
@@ -112,38 +119,10 @@ async function collectTopicTrends() {
     const result = data.data || {};
     best5Posts = result.best5 || [];
     topicPosts = result.all20 || [];
-
-    // Render Best 5
-    if (best5Posts.length > 0) {
-      best5Section.style.display = 'block';
-      best5Container.innerHTML = best5Posts.map(p => {
-        const titleText = cleanDisplayTitle(p.caption);
-        const isReel = p.isVideo || !!p.videoUrl;
-        const mediaBadge = isReel 
-          ? '<span class="media-badge reel">🎬 릴스</span>' 
-          : '<span class="media-badge cardnews">📑 카드뉴스</span>';
-
-        return `
-          <div class="feed-card" style="border-color: var(--accent-orange); background: linear-gradient(180deg, #221815 0%, var(--bg-surface) 100%);" onclick="selectPost('${p.id}', 'topic')">
-            <div>
-              <div class="card-top-meta">
-                <div class="card-top-left">
-                  <span class="card-tag" style="background: var(--accent-orange); color: #fff;">${p.topBadge}</span>
-                  ${mediaBadge}
-                </div>
-                <a href="${p.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();" title="인스타그램에서 원본 게시물 보기">🔗 원본 보기 ↗</a>
-              </div>
-              <div class="card-title" title="${p.caption.replace(/"/g, '&quot;')}">${titleText}</div>
-              <div class="card-snippet">🔥 ${p.whyHot}</div>
-            </div>
-            <div class="card-footer-meta">
-              <span style="color: var(--accent-orange); font-weight: 800; font-size: 13px;">❤️ ${p.likesCount.toLocaleString()}</span>
-              <span style="font-size: 11px; color: var(--text-muted);">${p.author}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
+    selectedBestIds.clear();
+    document.getElementById('batch-progress').style.display = 'none';
+    document.getElementById('batch-log').innerHTML = '';
+    renderBest5Cards();
 
     // Render All 20
     if (topicPosts.length === 0) {
@@ -184,6 +163,231 @@ async function collectTopicTrends() {
     startCooldown(btn, originalHtml, 3);
   }
 }
+
+// 1-1. 베스트 TOP 5 선택 & 일괄 생성
+function renderBest5Cards() {
+  if (best5Posts.length === 0) {
+    best5Section.style.display = 'none';
+    updateBatchToolbar();
+    return;
+  }
+
+  best5Section.style.display = 'block';
+  best5Container.innerHTML = best5Posts.map(p => {
+    const titleText = cleanDisplayTitle(p.caption);
+    const isReel = p.isVideo || !!p.videoUrl;
+    const mediaBadge = isReel
+      ? '<span class="media-badge reel">🎬 릴스</span>'
+      : '<span class="media-badge cardnews">📑 카드뉴스</span>';
+    const selected = selectedBestIds.has(p.id);
+
+    return `
+      <div class="feed-card ${selected ? 'batch-selected' : ''}" data-post-id="${p.id}" style="border-color: var(--accent-orange); background: linear-gradient(180deg, #221815 0%, var(--bg-surface) 100%);" onclick="selectPost('${p.id}', 'topic')">
+        <div>
+          <div class="card-top-meta">
+            <div class="card-top-left">
+              <label class="batch-check" title="일괄 생성 선택" onclick="event.stopPropagation()">
+                <input type="checkbox" ${selected ? 'checked' : ''} onchange="toggleBestSelection('${p.id}', this.checked)">
+              </label>
+              <span class="card-tag" style="background: var(--accent-orange); color: #fff;">${p.topBadge}</span>
+              ${mediaBadge}
+            </div>
+            <a href="${p.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();" title="인스타그램에서 원본 게시물 보기">🔗 원본 보기 ↗</a>
+          </div>
+          <div class="card-title" title="${p.caption.replace(/"/g, '&quot;')}">${titleText}</div>
+          <div class="card-snippet">🔥 ${p.whyHot}</div>
+        </div>
+        <div class="card-footer-meta">
+          <span style="color: var(--accent-orange); font-weight: 800; font-size: 13px;">❤️ ${p.likesCount.toLocaleString()}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">${p.author}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  updateBatchToolbar();
+}
+
+function updateBatchToolbar() {
+  const total = best5Posts.length;
+  const count = best5Posts.filter(p => selectedBestIds.has(p.id)).length;
+  btnBatchGenerate.innerHTML = `<span>⚡</span> 선택 ${count}개 일괄생성`;
+  btnBatchGenerate.disabled = count === 0 || isBatchRunning;
+  bestSelectAll.checked = total > 0 && count === total;
+  bestSelectAll.indeterminate = count > 0 && count < total;
+  bestSelectAll.disabled = total === 0 || isBatchRunning;
+}
+
+window.toggleBestSelection = function(id, checked) {
+  if (checked) selectedBestIds.add(id);
+  else selectedBestIds.delete(id);
+
+  const card = best5Container.querySelector(`[data-post-id="${id}"]`);
+  if (card) card.classList.toggle('batch-selected', checked);
+  updateBatchToolbar();
+};
+
+bestSelectAll.addEventListener('change', () => {
+  selectedBestIds.clear();
+  if (bestSelectAll.checked) {
+    best5Posts.forEach(p => selectedBestIds.add(p.id));
+  }
+  best5Container.querySelectorAll('.batch-check input').forEach(cb => { cb.checked = bestSelectAll.checked; });
+  best5Container.querySelectorAll('[data-post-id]').forEach(el => el.classList.toggle('batch-selected', bestSelectAll.checked));
+  updateBatchToolbar();
+});
+
+async function postJson(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({ error: '응답을 읽을 수 없습니다.' }));
+  if (!data.success) throw new Error(data.error || '요청이 실패했습니다.');
+  return data;
+}
+
+function escapeBatchText(value) {
+  return String(value || '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+}
+
+function appendBatchLog(html) {
+  const line = document.createElement('div');
+  line.innerHTML = html;
+  batchLog.appendChild(line);
+  batchLog.scrollTop = batchLog.scrollHeight;
+}
+
+function topicDataFromPost(post) {
+  const isReel = post.isVideo || !!post.videoUrl;
+  return {
+    topic: cleanDisplayTitle(post.caption),
+    caption: post.caption,
+    summary: post.whyHot,
+    source: post.author,
+    url: post.url,
+    videoUrl: post.videoUrl || null,
+    imageUrls: post.imageUrls || [],
+    likesCount: post.likesCount || 0,
+    viewsCount: post.viewsCount || 0,
+    mediaType: isReel ? 'reel' : 'cardnews'
+  };
+}
+
+async function generateOnePost(post, index, total) {
+  const title = cleanDisplayTitle(post.caption);
+  appendBatchLog(`<div style="color:#E5E7EB; font-weight:800; margin-top:4px;">${index + 1}/${total} · ${escapeBatchText(title.slice(0, 60))}</div>`);
+
+  const topicData = topicDataFromPost(post);
+
+  appendBatchLog('&nbsp;&nbsp;🔍 딥분석 중...');
+  const analysis = await postJson('/api/analyze-multimodal', {
+    topic: topicData.topic,
+    caption: topicData.caption,
+    videoUrl: topicData.videoUrl,
+    imageUrls: topicData.imageUrls,
+    likesCount: topicData.likesCount,
+    viewsCount: topicData.viewsCount
+  });
+
+  const angles = analysis.top3Angles || [];
+  const angle = angles.find(a => a.id === savedAngleId) || angles[0];
+  if (!angle) throw new Error('추천 관점이 없습니다.');
+
+  appendBatchLog(`&nbsp;&nbsp;✍️ 대본 생성 중... (${escapeBatchText(angle.title)})`);
+  const scriptRes = await postJson('/api/generate-advanced-script', {
+    topic: topicData.topic,
+    angleId: angle.id,
+    slideCount: slideCountSelect.value,
+    userFeedback: userFeedbackInput.value,
+    customHook: angle.customHook || '',
+    coreContext: {
+      caption: topicData.caption,
+      audioText: analysis.audioText,
+      imageText: analysis.imageText
+    }
+  });
+
+  appendBatchLog('&nbsp;&nbsp;📁 리포트 저장 중...');
+  const saveRes = await postJson('/api/save-report', {
+    topicData,
+    multimodalData: analysis,
+    selectedAngle: angle,
+    script: scriptRes.script
+  });
+
+  let script = scriptRes.script;
+  let imageNote = '이미지 없음';
+  try {
+    appendBatchLog('&nbsp;&nbsp;🖼️ AI 이미지 생성 중...');
+    const imgRes = await postJson('/api/generate-images', { script, folderName: saveRes.folderName });
+    if (imgRes.script) script = imgRes.script;
+    imageNote = `${imgRes.generated.length}장 생성`;
+  } catch (imageErr) {
+    imageNote = '이미지 실패';
+    appendBatchLog(`&nbsp;&nbsp;⚠️ 이미지 실패: ${escapeBatchText(imageErr.message)}`);
+  }
+
+  appendBatchLog('&nbsp;&nbsp;🎨 PNG 렌더 중...');
+  const renderRes = await postJson('/api/render', {
+    script,
+    folderName: saveRes.folderName,
+    theme: getCardTheme()
+  });
+
+  appendBatchLog(`&nbsp;&nbsp;✅ 완료 · ${renderRes.images.length}장 PNG · ${imageNote} · <a href="${renderRes.images[0]}" target="_blank" style="color:#A5B4FC;">첫 장 보기 ↗</a>`);
+  return { title, folder: saveRes.folderName, images: renderRes.images, imageNote };
+}
+
+async function runBatchGeneration() {
+  if (isBatchRunning) return;
+
+  const posts = best5Posts.filter(p => selectedBestIds.has(p.id));
+  if (posts.length === 0) return;
+
+  const confirmed = confirm(
+    `선택한 ${posts.length}개 항목을 일괄 생성합니다.\n\n` +
+    '항목마다 딥분석 → 대본 생성 → 리포트 저장 → AI 이미지 생성 → PNG 렌더가 순서대로 실행됩니다.\n' +
+    'OpenAI 크레딧이 사용됩니다. 계속할까요?'
+  );
+  if (!confirmed) return;
+
+  isBatchRunning = true;
+  isGlobalBusy = true;
+  updateBatchToolbar();
+
+  batchProgress.style.display = 'block';
+  batchLog.innerHTML = '';
+  batchProgressHead.innerText = `일괄 생성 준비 중... 0 / ${posts.length}`;
+
+  const results = [];
+
+  for (const [index, post] of posts.entries()) {
+    batchProgressHead.innerText = `일괄 생성 중... ${index} / ${posts.length}`;
+    try {
+      const result = await generateOnePost(post, index, posts.length);
+      results.push({ ...result, ok: true });
+    } catch (err) {
+      appendBatchLog(`&nbsp;&nbsp;❌ 실패: ${escapeBatchText(err.message)}`);
+      results.push({ title: cleanDisplayTitle(post.caption), ok: false, error: err.message });
+    }
+    batchProgressHead.innerText = `일괄 생성 중... ${index + 1} / ${posts.length}`;
+  }
+
+  const okCount = results.filter(r => r.ok).length;
+  batchProgressHead.innerText = `일괄 생성 완료 · 성공 ${okCount} / ${posts.length}`;
+
+  isBatchRunning = false;
+  isGlobalBusy = false;
+  updateBatchToolbar();
+
+  const failed = results.filter(r => !r.ok);
+  alert(`일괄 생성 완료: 성공 ${okCount}개 / 전체 ${posts.length}개` +
+    (failed.length ? `\n\n실패 ${failed.length}개\n${failed.map(r => `- ${r.title}: ${r.error}`).join('\n')}` : ''));
+}
+
+btnBatchGenerate.addEventListener('click', runBatchGeneration);
 
 // 2. [탭 2] 특정 계정 릴스 전수 수집
 async function collectAccountReels() {
@@ -248,27 +452,35 @@ function renderAccountCards(posts) {
   }).join('');
 }
 
-// 3. [탭 3] 네이버 실시간 핫이슈 뉴스 (부동산·정책·정치) 자동 수집
-async function collectEstateData() {
+// 3. [탭 3] 네이버 실시간 핫이슈 뉴스 (부동산·시사·재테크) 자동 수집
+let currentNewsCategory = 'all';
+
+async function collectEstateData(category) {
   if (isGlobalBusy) return;
   isGlobalBusy = true;
 
-  const btn = document.getElementById('btn-collect-estate');
-  const originalHtml = '<span>⚡</span> 최신 핫이슈 자동 수집';
+  if (category) currentNewsCategory = category;
+  const targetCat = currentNewsCategory || 'all';
 
+  const btn = document.getElementById('btn-collect-estate');
+  const originalHtml = '<span>⚡</span> 속보 수집';
+
+  const catNames = { all: '전체', estate: '부동산', politics: '시사', finance: '재테크' };
   btn.disabled = true;
-  btn.innerHTML = '<span>⏳</span> 실시간 핫이슈 뉴스 수집 중...';
-  estateContainer.innerHTML = '<div style="padding: 30px; color: var(--text-muted); text-align: center;">네이버 실시간 부동산·정책·정치 핫이슈 속보 수집 중...</div>';
+  btn.innerHTML = `<span>⏳</span> [${catNames[targetCat] || '뉴스'}] 수집 중...`;
+  estateContainer.innerHTML = `<div style="padding: 30px; color: var(--text-muted); text-align: center;">네이버 실시간 [${catNames[targetCat] || '핫이슈'}] 손실회피 뉴스 속보 수집 중...</div>`;
+  document.getElementById('top-picks-section').style.display = 'none';
 
   try {
     const res = await fetch('/api/collect/estate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
+      body: JSON.stringify({ category: targetCat })
     });
     const data = await res.json();
     estateNewsList = data.data || [];
-    renderEstateCards(estateNewsList);
+    renderTopPicks(data.topPicks || [], data.counts || {}, data.policyCount || 0);
+    renderEstateCards(estateNewsList, targetCat);
   } catch (err) {
     estateContainer.innerHTML = '<div style="padding: 30px; color: #EF4444; text-align: center;">핫이슈 뉴스 수집 실패</div>';
   } finally {
@@ -276,30 +488,96 @@ async function collectEstateData() {
   }
 }
 
-function renderEstateCards(list) {
-  if (list.length === 0) {
-    estateContainer.innerHTML = '<div style="padding: 30px; color: var(--text-muted); text-align: center;">수집된 데이터가 없습니다.</div>';
+const ANGLE_LABELS = {
+  angle_warning: '🚨 경고형',
+  angle_cheat: '📋 체크리스트형',
+  angle_calc: '🔢 계산기형',
+  angle_easy: '💡 3분 요약형',
+  angle_vs: '⚖️ VS 비교형',
+  angle_story: '📈 실화형',
+  angle_target: '🎯 타겟팅형'
+};
+
+function renderTopPicks(picks, counts, policyCount) {
+  const section = document.getElementById('top-picks-section');
+  const container = document.getElementById('top-picks-container');
+  const meta = document.getElementById('top-picks-meta');
+
+  if (!picks || picks.length === 0) {
+    section.style.display = 'none';
     return;
   }
-  estateContainer.innerHTML = list.map(item => `
-    <div class="feed-card" onclick="selectPost('${item.id}', 'estate')">
-      <div>
-        <div class="card-top-meta">
-          <div class="card-top-left">
-            <span class="card-tag" style="background: rgba(16, 185, 129, 0.15); color: var(--accent-green);">${item.tag || item.source}</span>
-            <span class="media-badge" style="background: rgba(16, 185, 129, 0.2); color: #6EE7B7; border: 1px solid rgba(16, 185, 129, 0.3);">⚡ 팩트이슈</span>
-          </div>
-          <a href="${item.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();">🔗 원문 기사 ↗</a>
+
+  meta.innerText = `부동산 ${counts.estate || 0} · 시사 ${counts.politics || 0} · 재테크 ${counts.finance || 0}건 중 · 정책 연관 ${policyCount}건`;
+
+  container.innerHTML = picks.map((p, idx) => `
+    <div class="top-pick-card" onclick="selectPost('${p.id}', 'estate')">
+      <div class="top-pick-rank">${idx + 1}</div>
+      <div class="top-pick-body">
+        <div class="top-pick-meta">
+          <span class="top-pick-field field-${p.field}">${p.fieldLabel}</span>
+          <span class="top-pick-angle">${ANGLE_LABELS[p.suggestedAngle] || '기획형'}</span>
+          <span class="top-pick-score">${p.walletScore}점</span>
         </div>
-        <div class="card-title">${item.title}</div>
-        <div class="card-snippet">${item.summary || ''}</div>
-      </div>
-      <div class="card-footer-meta">
-        <span style="color: var(--accent-orange); font-weight: 700;">${item.importance || '최신 브리핑'}</span>
-        <span style="font-size: 11px; color: var(--text-muted);">${item.source}</span>
+        <div class="top-pick-title">${p.title}</div>
+        <div class="top-pick-sub">
+          <span>${p.relevance || ''} · ${p.press}</span>
+          <a href="${p.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();">원문 ↗</a>
+        </div>
       </div>
     </div>
   `).join('');
+
+  section.style.display = 'block';
+}
+
+function renderEstateCards(list, targetCat = 'all') {
+  if (list.length === 0) {
+    const emptyMsg = targetCat === 'politics'
+      ? '오늘은 내 지갑에 직접 닿는 정책 뉴스가 없습니다.<br><span style="font-size:12px; color:var(--text-light);">시사는 정치 행사·사건사고가 아니라 세제·부동산·노동·연금 제도 변화만 소재로 씁니다. 위 #세제개편 태그로 인스타 트렌드를 확인해보세요.</span>'
+      : '수집된 데이터가 없습니다.';
+    estateContainer.innerHTML = `<div style="padding: 30px; color: var(--text-muted); text-align: center; line-height: 1.6;">${emptyMsg}</div>`;
+    return;
+  }
+
+  estateContainer.innerHTML = list.map(item => {
+    // 카테고리별 태그 컬러링
+    let tagStyle = 'background: rgba(16, 185, 129, 0.15); color: var(--accent-green);';
+    const tag = item.tag || '';
+    if (tag.includes('시사') || tag.includes('세제') || tag.includes('노동') || tag.includes('복지') || tag.includes('교육')) {
+      tagStyle = 'background: rgba(248, 113, 113, 0.2); color: #F87171;';
+    } else if (tag.includes('재테크') || tag.includes('세금')) {
+      tagStyle = 'background: rgba(52, 211, 153, 0.2); color: #34D399;';
+    } else if (tag.includes('부동산') || tag.includes('청약') || tag.includes('대출') || tag.includes('시세')) {
+      tagStyle = 'background: rgba(96, 165, 250, 0.2); color: #60A5FA;';
+    }
+
+    const isLossAlert = (item.relevance || '').includes('지갑') || (item.importance || '').includes('경고');
+    const badgeColor = isLossAlert ? '#F87171' : 'var(--accent-orange)';
+
+    return `
+      <div class="feed-card" onclick="selectPost('${item.id}', 'estate')" style="border-color: ${item.walletScore >= 60 ? 'rgba(248,113,113,0.35)' : 'var(--border-subtle)'};">
+        <div>
+          <div class="card-top-meta">
+            <div class="card-top-left">
+              <span class="card-tag" style="${tagStyle}">${item.tag || item.source}</span>
+              <span class="media-badge" style="background: rgba(255, 255, 255, 0.08); color: #E5E7EB;">${item.fieldLabel || '속보'}</span>
+            </div>
+            <a href="${item.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();">🔗 원문 기사 ↗</a>
+          </div>
+          <div class="card-title">${item.title}</div>
+          <div class="card-snippet">${item.summary || ''}</div>
+        </div>
+        <div class="card-footer-meta">
+          <span style="color: ${badgeColor}; font-weight: 700;">${item.relevance || '최신 브리핑'}</span>
+          <span style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size: 11px; font-weight: 800; color: ${item.walletScore >= 60 ? '#F87171' : 'var(--text-muted)'};">적합도 ${item.walletScore ?? '-'}점</span>
+            <span style="font-size: 11px; color: var(--text-muted);">${item.source}</span>
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // 4. [탭 4] 릴스 URL 역분석
@@ -375,6 +653,7 @@ async function analyzeReelsUrl() {
 // State Management for 4-Step Interactive Studio
 let multimodalAnalysisData = null;
 let selectedAngleId = 'angle_warning';
+let savedAngleId = 'angle_warning';
 let generatedCardScript = null;
 
 // DOM Elements for 4-Step Studio
@@ -394,6 +673,123 @@ const scriptPreviewContent = document.getElementById('script-preview-content');
 const scriptSlidesBadge = document.getElementById('script-slides-badge');
 const sectionRender = document.getElementById('section-render');
 const btnSaveReport = document.getElementById('btn-save-report');
+const btnRenderCards = document.getElementById('btn-render-cards');
+const cardsGallery = document.getElementById('cards-gallery');
+const btnGenerateImages = document.getElementById('btn-generate-images');
+const imagesPreview = document.getElementById('images-preview');
+const themeBgInput = document.getElementById('theme-bg');
+const themeTitleInput = document.getElementById('theme-title');
+const themeAccentInput = document.getElementById('theme-accent');
+const btnResetTheme = document.getElementById('btn-reset-theme');
+const themeContrastWarning = document.getElementById('theme-contrast-warning');
+
+const DEFAULT_CARD_THEME = { bg: '#F7F5F0', title: '#191A1E', accent: '#D9532F' };
+
+function relativeLuminance(hex) {
+  const v = hex.replace('#', '');
+  const rgb = [0, 2, 4].map(i => parseInt(v.slice(i, i + 2), 16) / 255);
+  const [r, g, b] = rgb.map(c => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(a, b) {
+  const l1 = relativeLuminance(a);
+  const l2 = relativeLuminance(b);
+  const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+function updateThemeContrastWarning() {
+  const ratio = contrastRatio(themeBgInput.value, themeTitleInput.value);
+  themeContrastWarning.style.display = ratio < 3 ? 'block' : 'none';
+}
+
+function getCardTheme() {
+  return {
+    bg: themeBgInput.value,
+    title: themeTitleInput.value,
+    accent: themeAccentInput.value
+  };
+}
+
+let pendingSettings = {};
+let settingsTimer = null;
+
+function persistSettings(patch) {
+  Object.assign(pendingSettings, patch);
+  clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(() => {
+    const body = pendingSettings;
+    pendingSettings = {};
+    fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).catch(() => { /* 저장 실패는 무시하고 다음 변경에서 재시도 */ });
+  }, 350);
+}
+
+function applyCardTheme(theme, options = {}) {
+  themeBgInput.value = theme.bg || DEFAULT_CARD_THEME.bg;
+  themeTitleInput.value = theme.title || DEFAULT_CARD_THEME.title;
+  themeAccentInput.value = theme.accent || DEFAULT_CARD_THEME.accent;
+  updateThemeContrastWarning();
+  try {
+    localStorage.setItem('cardnews_theme', JSON.stringify(getCardTheme()));
+  } catch (e) { /* storage unavailable */ }
+  if (options.persist) persistSettings({ theme: getCardTheme() });
+}
+
+function applySettings(settings = {}) {
+  if (settings.theme) applyCardTheme(settings.theme);
+  if (settings.slideCount && slideCountSelect) slideCountSelect.value = String(settings.slideCount);
+  if (typeof settings.userFeedback === 'string' && userFeedbackInput) userFeedbackInput.value = settings.userFeedback;
+  if (settings.selectedAngleId) savedAngleId = settings.selectedAngleId;
+}
+
+(async function loadServerSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    const data = await res.json();
+    if (!data.success) return;
+    if (data.exists) {
+      applySettings(data.settings);
+    } else {
+      persistSettings({
+        theme: getCardTheme(),
+        slideCount: slideCountSelect.value,
+        userFeedback: userFeedbackInput.value,
+        selectedAngleId: savedAngleId
+      });
+    }
+  } catch (e) { /* 서버 설정이 없으면 localStorage 기본값 사용 */ }
+})();
+
+(function initCardTheme() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('cardnews_theme') || 'null');
+    if (saved) applyCardTheme(saved);
+  } catch (e) { /* ignore */ }
+
+  [themeBgInput, themeTitleInput, themeAccentInput].forEach(input => {
+    input.addEventListener('input', () => applyCardTheme(getCardTheme(), { persist: true }));
+  });
+
+  btnResetTheme.addEventListener('click', () => applyCardTheme(DEFAULT_CARD_THEME, { persist: true }));
+
+  document.querySelectorAll('.theme-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      applyCardTheme({
+        bg: btn.getAttribute('data-bg'),
+        title: btn.getAttribute('data-title'),
+        accent: btn.getAttribute('data-accent')
+      }, { persist: true });
+    });
+  });
+
+  slideCountSelect.addEventListener('change', () => persistSettings({ slideCount: slideCountSelect.value }));
+  userFeedbackInput.addEventListener('input', () => persistSettings({ userFeedback: userFeedbackInput.value }));
+})();
 const savedFolderBadge = document.getElementById('saved-folder-badge');
 const savedFilePath = document.getElementById('saved-file-path');
 const reportMarkdownPreview = document.getElementById('report-markdown-preview');
@@ -446,7 +842,11 @@ window.selectPost = function(id, type) {
         url: target.url,
         likesCount: 500,
         viewsCount: 15000,
-        mediaType: 'estate'
+        mediaType: 'estate',
+        walletScore: target.walletScore,
+        relevance: target.relevance,
+        suggestedAngle: target.suggestedAngle,
+        fieldLabel: target.fieldLabel
       };
     }
   }
@@ -473,7 +873,7 @@ function updateStudioStep1() {
     btnAnalyzeText = '<span>👁️</span> 카드 슬라이드 Vision & 4대 심층 분석 시작';
     badgeStatusText = '카드 이미지 Vision 분석 대기';
   } else {
-    mediaBadgeHtml = '<span class="media-badge" style="background: rgba(16, 185, 129, 0.2); color: #6EE7B7; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 6px;">⚡ 부동산 팩트 브리핑</span>';
+    mediaBadgeHtml = '<span class="media-badge" style="background: rgba(16, 185, 129, 0.2); color: #6EE7B7; border: 1px solid rgba(16, 185, 129, 0.3); margin-left: 6px;">⚡ 3대 분야 팩트 브리핑</span>';
     btnAnalyzeText = '<span>⚡</span> 팩트 데이터 & 4대 심층 분석 시작';
     badgeStatusText = '팩트 데이터 분석 대기';
   }
@@ -521,7 +921,7 @@ btnDeepAnalyze.addEventListener('click', async () => {
     ? '<span>⏳</span> Whisper STT 음성 전사 & 4대 심층 분석 중...'
     : isCardNews 
       ? '<span>⏳</span> Vision AI 슬라이드 해체 & 4대 심층 분석 중...'
-      : '<span>⏳</span> 부동산 팩트 데이터 4대 심층 분석 중...';
+      : '<span>⏳</span> 3대 분야 팩트 데이터 4대 심층 분석 중...';
       
   sttStatusBadge.innerText = '심층 딥분석 진행 중...';
 
@@ -599,7 +999,8 @@ btnDeepAnalyze.addEventListener('click', async () => {
 // Render TOP 3 Angles Cards with Explicit Selection Reason, 1st Hook & Detailed Storyline
 function renderTop3Angles(top3, criteria, remaining) {
   if (top3.length > 0) {
-    selectedAngleId = top3[0].id;
+    const preferred = top3.find(a => a.id === savedAngleId);
+    selectedAngleId = (preferred || top3[0]).id;
   }
 
   const top3Html = top3.map((a, idx) => {
@@ -646,6 +1047,8 @@ function renderTop3Angles(top3, criteria, remaining) {
 
 window.selectAngle = function(angleId) {
   selectedAngleId = angleId;
+  savedAngleId = angleId;
+  persistSettings({ selectedAngleId: angleId });
   document.querySelectorAll('.angle-card').forEach(c => {
     c.classList.toggle('active', c.getAttribute('data-angle') === angleId);
   });
@@ -699,6 +1102,13 @@ btnGenerateScript.addEventListener('click', async () => {
 
     // Step 4 Render Section Enable
     sectionRender.style.display = 'block';
+    cardsGallery.style.display = 'none';
+    cardsGallery.innerHTML = '';
+    imagesPreview.style.display = 'none';
+    imagesPreview.innerHTML = '';
+    resultZone.style.display = 'none';
+    savedFolderBadge.innerText = '';
+    savedFilePath.innerHTML = '';
 
   } catch (err) {
     console.error('대본 생성 오류:', err);
@@ -709,6 +1119,31 @@ btnGenerateScript.addEventListener('click', async () => {
 });
 
 // 4. Step 4: 자료수집 완료 및 종합 Markdown 리포트 파일 저장
+async function requestSaveReport() {
+  const selectedAngleObj = (multimodalAnalysisData?.allAngles || multimodalAnalysisData?.top3Angles || []).find(a => a.id === selectedAngleId);
+
+  const saveRes = await fetch('/api/save-report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      topicData: selectedTopicData,
+      multimodalData: multimodalAnalysisData,
+      selectedAngle: selectedAngleObj,
+      script: generatedCardScript
+    })
+  });
+  const saveData = await saveRes.json();
+  if (!saveData.success) throw new Error(saveData.error || '리포트 저장 실패');
+
+  resultZone.style.display = 'flex';
+  savedFolderBadge.innerText = saveData.folderName;
+  savedFilePath.innerHTML = `
+    <div><strong>📄 생성된 리포트:</strong> <code style="background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 4px; color: #6EE7B7; font-weight: 700;">${saveData.reportPath}</code></div>
+  `;
+  reportMarkdownPreview.innerText = saveData.markdownSummary;
+  return saveData;
+}
+
 btnSaveReport.addEventListener('click', async () => {
   if (!generatedCardScript || !selectedTopicData || isGlobalBusy) return;
   isGlobalBusy = true;
@@ -717,45 +1152,145 @@ btnSaveReport.addEventListener('click', async () => {
   btnSaveReport.disabled = true;
   btnSaveReport.innerHTML = '<span>⏳</span> 리포트 및 대본 파일 생성 중...';
 
-  const selectedAngleObj = (multimodalAnalysisData?.allAngles || multimodalAnalysisData?.top3Angles || []).find(a => a.id === selectedAngleId);
-
   try {
-    const saveRes = await fetch('/api/save-report', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        topicData: selectedTopicData,
-        multimodalData: multimodalAnalysisData,
-        selectedAngle: selectedAngleObj,
-        script: generatedCardScript
-      })
-    });
-    const saveData = await saveRes.json();
-
-    if (saveData.success) {
-      resultZone.style.display = 'flex';
-      savedFolderBadge.innerText = saveData.folderName;
-      savedFilePath.innerHTML = `
-        <div><strong>📄 생성된 리포트:</strong> <code style="background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 4px; color: #6EE7B7; font-weight: 700;">${saveData.reportPath}</code></div>
-      `;
-      reportMarkdownPreview.innerText = saveData.markdownSummary;
-
-      alert(`🎉 [${saveData.folderName}] 자료수집 완료!\n'${saveData.reportPath}' 파일에 원본 정보, 음성 STT, 4대 심층 분석 및 대본이 완벽하게 저장되었습니다.`);
-    } else {
-      alert(`저장 실패: ${saveData.error}`);
-    }
+    const saveData = await requestSaveReport();
+    alert(`🎉 [${saveData.folderName}] 자료수집 완료!\n'${saveData.reportPath}' 파일에 원본 정보, 음성 STT, 4대 심층 분석 및 대본이 완벽하게 저장되었습니다.`);
   } catch (err) {
     console.error('리포트 저장 오류:', err);
-    alert('리포트 저장 중 오류가 발생했습니다.');
+    alert(`저장 실패: ${err.message}`);
   } finally {
     startCooldown(btnSaveReport, originalHtml, 3);
   }
 });
 
+// 5. Step 5: AI 이미지 생성 & 1080x1350 카드뉴스 PNG 렌더링
+async function ensureReportFolder() {
+  let folder = savedFolderBadge.innerText.trim();
+  if (!folder || resultZone.style.display === 'none') {
+    const saveData = await requestSaveReport();
+    folder = saveData.folderName;
+  }
+  return folder;
+}
+
+async function renderCardsToFolder(folder) {
+  const renderRes = await fetch('/api/render', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ script: generatedCardScript, folderName: folder, theme: getCardTheme() })
+  });
+  const renderData = await renderRes.json();
+  if (!renderData.success) throw new Error(renderData.error || '렌더링 실패');
+
+  cardsGallery.style.display = 'grid';
+  cardsGallery.innerHTML = renderData.images.map((src, i) => `
+    <a class="card-thumb" href="${src}" target="_blank">
+      <img src="${src}" alt="카드뉴스 ${i + 1}장">
+      <span>${String(i + 1).padStart(2, '0')}장 · 원본 열기 ↗</span>
+    </a>
+  `).join('');
+
+  return renderData;
+}
+
+// 5-1. AI 슬라이드 이미지 생성 → 카드에 반영
+btnGenerateImages.addEventListener('click', async () => {
+  if (!generatedCardScript || !selectedTopicData || isGlobalBusy) return;
+
+  const visualCount = generatedCardScript.slides.filter(s => s.type === 'cover' || s.type === 'body_visual').length;
+  if (visualCount === 0) {
+    return alert('이미지가 들어가는 표지·비주얼 슬라이드가 없습니다.');
+  }
+  if (!confirm(`AI 이미지 ${visualCount}장을 생성합니다.\nOpenAI 크레딧이 사용됩니다. 계속할까요?`)) return;
+
+  isGlobalBusy = true;
+  const originalHtml = '<span>🖼️</span> AI 슬라이드 이미지 생성 (표지·비주얼)';
+  btnGenerateImages.disabled = true;
+  btnGenerateImages.innerHTML = '<span>⏳</span> 이미지 생성 중... (슬라이드당 10~30초)';
+
+  try {
+    const folder = await ensureReportFolder();
+
+    const res = await fetch('/api/generate-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ script: generatedCardScript, folderName: folder })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || '이미지 생성 실패');
+    if (!data.generated || data.generated.length === 0) throw new Error(data.message || '생성된 이미지가 없습니다.');
+
+    generatedCardScript = data.script;
+
+    imagesPreview.style.display = 'grid';
+    imagesPreview.innerHTML = data.generated.map(g => `
+      <a class="card-thumb" href="${g.path}" target="_blank">
+        <img src="${g.path}" alt="슬라이드 ${g.slide_number} 이미지">
+        <span>이미지 ${String(g.slide_number).padStart(2, '0')} · 카드 반영</span>
+      </a>
+    `).join('');
+
+    const renderData = await renderCardsToFolder(folder);
+    const errNote = data.errors?.length ? `\n(실패 ${data.errors.length}장: ${data.errors[0].error})` : '';
+    alert(`🎉 이미지 ${data.generated.length}장 생성 → 카드 ${renderData.images.length}장에 반영 완료!${errNote}`);
+  } catch (err) {
+    console.error('이미지 생성 오류:', err);
+    alert(`이미지 생성 실패: ${err.message}`);
+  } finally {
+    startCooldown(btnGenerateImages, originalHtml, 3);
+  }
+});
+
+// 5-2. 카드뉴스 PNG 렌더링
+btnRenderCards.addEventListener('click', async () => {
+  if (!generatedCardScript || !selectedTopicData || isGlobalBusy) return;
+  isGlobalBusy = true;
+
+  const originalHtml = '<span>🎨</span> 카드뉴스 PNG 4장 생성 (1080x1350)';
+  btnRenderCards.disabled = true;
+  btnRenderCards.innerHTML = '<span>⏳</span> 1080x1350 PNG 렌더링 중...';
+
+  try {
+    const folder = await ensureReportFolder();
+    const renderData = await renderCardsToFolder(folder);
+    alert(`🎉 카드뉴스 ${renderData.images.length}장 생성 완료!\noutputs/${renderData.folder}/cards/`);
+  } catch (err) {
+    console.error('카드 렌더링 오류:', err);
+    alert(`카드 생성 실패: ${err.message}`);
+  } finally {
+    startCooldown(btnRenderCards, originalHtml, 3);
+  }
+});
+
 // Event Listeners for Left Tabs
-document.getElementById('btn-collect-topic').addEventListener('click', collectTopicTrends);
+document.getElementById('btn-collect-topic').addEventListener('click', () => collectTopicTrends());
 document.getElementById('btn-collect-accounts').addEventListener('click', collectAccountReels);
-document.getElementById('btn-collect-estate').addEventListener('click', collectEstateData);
+document.getElementById('btn-collect-estate').addEventListener('click', () => collectEstateData());
 document.getElementById('btn-analyze-reels').addEventListener('click', analyzeReelsUrl);
+
+// 2839 손실회피 퀵 프리셋 키워드 클릭 이벤트
+document.querySelectorAll('.preset-tag-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    const keyword = btn.getAttribute('data-keyword');
+    const input = document.getElementById('topic-keyword-input');
+    if (input && keyword) {
+      input.value = keyword;
+      collectTopicTrends();
+    }
+  });
+});
+
+// 네이버 실시간 뉴스 카테고리 필터 버튼 클릭 이벤트
+document.querySelectorAll('.news-category-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelectorAll('.news-category-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cat = btn.getAttribute('data-cat');
+    collectEstateData(cat);
+  });
+});
+
 
 
