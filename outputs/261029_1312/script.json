@@ -1,0 +1,89 @@
+{
+  "project_title": "[ 이 제도 시행일 모르면 지원금 못 받습니다. 신청 조건·서류·마감일 3분 정리 카드뉴스",
+  "category": "트렌드 · 심층 분석",
+  "date": "202610.29.",
+  "author": {
+    "name": "@realestate_insights",
+    "avatar_letter": "R"
+  },
+  "tagline": "⚖️ 데이터 검증 · 극단 비교",
+  "slides": [
+    {
+      "slide_number": 1,
+      "total_slides": 4,
+      "type": "cover",
+      "tagline": "⚖️ 데이터 검증 · 극단 비교",
+      "headline_prefix": "부동산 지원금",
+      "headline_highlight": "[ 시행일 미리 알아야 대박! ]",
+      "headline_suffix": "신청 조건 및 서류 정리",
+      "image_caption": "이제는 필수, 지원금 완벽 가이드",
+      "swipe_text": "밀어서 전체 리스트 확인",
+      "image_path": "outputs/261029_1312/assets/slide_01.png"
+    },
+    {
+      "slide_number": 2,
+      "total_slides": 4,
+      "type": "body_list",
+      "step_badge": "PART 01",
+      "title": "지원금의 핵심 조건",
+      "points": [
+        {
+          "number": 1,
+          "heading": "신청 자격 확인",
+          "desc": "정확한 자격 기준을 파악하세요!"
+        },
+        {
+          "number": 2,
+          "heading": "필요 서류 준비",
+          "desc": "신청에 필요한 서류를 미리 준비해두세요."
+        },
+        {
+          "number": 3,
+          "heading": "신청 마감일",
+          "desc": "신청 마감일을 놓치지 않도록 주의하세요."
+        }
+      ]
+    },
+    {
+      "slide_number": 3,
+      "total_slides": 4,
+      "type": "body_list",
+      "step_badge": "PART 02",
+      "title": "신청 방법 및 팁",
+      "points": [
+        {
+          "number": 1,
+          "heading": "온라인 신청",
+          "desc": "웹사이트에서 간편하게 신청 가능!"
+        },
+        {
+          "number": 2,
+          "heading": "방문 신청",
+          "desc": "관할 구청에서 직접 신청할 수 있습니다."
+        },
+        {
+          "number": 3,
+          "heading": "사전 상담",
+          "desc": "전체 절차를 미리 상담받고 준비하세요."
+        }
+      ]
+    },
+    {
+      "slide_number": 4,
+      "total_slides": 4,
+      "type": "cta",
+      "summary_title": "오늘의 핵심 포인트 3줄 요약",
+      "summary_items": [
+        "지원금 신청, 자격부터 확인!",
+        "서류 미비는 지원금을 놓치는 길!",
+        "마감일 꼭 챙겨야 받는다!"
+      ],
+      "action_title": "더 많은 꿀팁이 궁금하다면?",
+      "action_desc": "저장하고 매일 새로운 인사이트를 받아보세요!",
+      "icons": [
+        "저장하기",
+        "공유하기"
+      ]
+    }
+  ]
+}

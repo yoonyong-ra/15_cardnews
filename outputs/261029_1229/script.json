@@ -1,0 +1,88 @@
+{
+  "project_title": "[ 이 제도 시행일 모르면 지원금 못 받습니다. 신청 조건·서류·마감일 3분 정리 카드뉴스",
+  "category": "트렌드 · 심층 분석",
+  "date": "202610.29.",
+  "author": {
+    "name": "@realestate_insights",
+    "avatar_letter": "R"
+  },
+  "tagline": "🚨 긴급 점검 · 손실 방지",
+  "slides": [
+    {
+      "slide_number": 1,
+      "total_slides": 4,
+      "type": "cover",
+      "tagline": "🚨 긴급 점검 · 손실 방지",
+      "headline_prefix": "지원금 놓치지 마세요!",
+      "headline_highlight": "[ 이 제도 시행일 모르면 지원금 못 받습니다.",
+      "headline_suffix": "신청 조건·서류·마감일 3분 정리",
+      "image_caption": "지원금 확인은 필수!",
+      "swipe_text": "밀어서 전체 리스트 확인"
+    },
+    {
+      "slide_number": 2,
+      "total_slides": 4,
+      "type": "body_list",
+      "step_badge": "PART 01",
+      "title": "제도 시행일과 신청 조건",
+      "points": [
+        {
+          "number": 1,
+          "heading": "시행일 확인",
+          "desc": "제도 시행일을 확인하지 않으면 지원금 신청이 불가능합니다."
+        },
+        {
+          "number": 2,
+          "heading": "신청 대상",
+          "desc": "신청 자격을 확인하여 본인이 포함되는지 반드시 체크하세요."
+        },
+        {
+          "number": 3,
+          "heading": "서류 준비",
+          "desc": "필요한 서류 리스트를 미리 준비해야 합니다."
+        }
+      ]
+    },
+    {
+      "slide_number": 3,
+      "total_slides": 4,
+      "type": "body_list",
+      "step_badge": "CHECK 02",
+      "title": "신청서류 및 마감일",
+      "points": [
+        {
+          "number": 1,
+          "heading": "필수 서류",
+          "desc": "성적증명서, 소득증명서 등 필수 서류를 준비하세요."
+        },
+        {
+          "number": 2,
+          "heading": "신청 마감일",
+          "desc": "신청 마감일을 반드시 기억하고 놓치지 마세요!"
+        },
+        {
+          "number": 3,
+          "heading": "신청 방법",
+          "desc": "온라인, 오프라인 신청 방법을 사전에 숙지하세요."
+        }
+      ]
+    },
+    {
+      "slide_number": 4,
+      "total_slides": 4,
+      "type": "cta",
+      "summary_title": "오늘의 핵심 포인트 3줄 요약",
+      "summary_items": [
+        "시행일 정확히 확인",
+        "신청 조건 미리 체크",
+        "서류 준비 및 마감일 기억"
+      ],
+      "action_title": "더 많은 꿀팁이 궁금하다면?",
+      "action_desc": "저장하고 매일 새로운 인사이트를 받아보세요!",
+      "icons": [
+        "저장하기",
+        "공유하기"
+      ]
+    }
+  ]
+}

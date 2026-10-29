@@ -1,0 +1,87 @@
+{
+  "category": "부동산 · 시사 · 재테크",
+  "date": "2026.10.29",
+  "author": {
+    "name": "@2839.studio",
+    "avatar_letter": "2"
+  },
+  "slides": [
+    {
+      "slide_number": 1,
+      "total_slides": 4,
+      "type": "cover",
+      "tagline": "🚨 긴급 점검 · 손실 방지",
+      "headline_prefix": "3기 신도시 본청약",
+      "headline_highlight": "분양가 수억 폭등",
+      "headline_suffix": "계약 전 손실 계산",
+      "image_caption": "분담금 리스크, 지금 계산해보세요",
+      "swipe_text": "밀어서 전체 리스트 확인"
+    },
+    {
+      "slide_number": 2,
+      "total_slides": 4,
+      "type": "body_list",
+      "step_badge": "PART 01",
+      "title": "청약 전 알아야 할 사항",
+      "points": [
+        {
+          "number": "01",
+          "heading": "보증금 미반환 위험",
+          "desc": "청약 포기 시 보증금 환급이 어려울 수 있습니다."
+        },
+        {
+          "number": "02",
+          "heading": "DSR 한도 축소",
+          "desc": "현재 부채를 고려한 대출 한도가 줄어드니 신중해야 합니다."
+        },
+        {
+          "number": "03",
+          "heading": "청약 부적격 문제",
+          "desc": "부적격 사유에 따라 청약 기회를 잃을 수 있습니다."
+        }
+      ]
+    },
+    {
+      "slide_number": 3,
+      "total_slides": 4,
+      "type": "body_list",
+      "step_badge": "PART 02",
+      "title": "리스크 관리 체크리스트",
+      "points": [
+        {
+          "number": "01",
+          "heading": "세금 및 추가 비용",
+          "desc": "분양가 외 숨겨진 비용을 체크해야 합니다."
+        },
+        {
+          "number": "02",
+          "heading": "대출 상품 비교",
+          "desc": "가장 유리한 조건으로 대출을 받아야 합니다."
+        },
+        {
+          "number": "03",
+          "heading": "정책 변화 예의주시",
+          "desc": "부동산 정책에 대한 최신 정보를 파악해야 손해를 줄일 수 있습니다."
+        }
+      ]
+    },
+    {
+      "slide_number": 4,
+      "total_slides": 4,
+      "type": "cta",
+      "summary_title": "오늘의 핵심 포인트 3줄 요약",
+      "summary_items": [
+        "**요약 타이틀:** **오늘의 핵심 포인트 3줄 요약**",
+        "청약 전, 잃을 것에 대한 대비가 필수!",
+        "DSR 축소로 대출에 변동이 올 수 있음",
+        "정확한 정보로 손실을 최소화하세요."
+      ],
+      "action_title": "이 글이 도움되셨다면 저장하고 공유해보세요!",
+      "action_desc": "놓치면 손해로 이어질 수 있습니다.",
+      "icons": [
+        "게시물 저장하기",
+        "지인에게 공유하기"
+      ]
+    }
+  ]
+}

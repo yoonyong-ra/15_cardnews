@@ -1,0 +1,114 @@
+{
+  "project_title": "[ 계약서에 이 특약 한 줄 안 넣으면 보증금 2억 평생 날립니다! 전세 계약 전 무조건 확인해야 할 3대 필수 특약... 카드뉴스",
+  "category": "트렌드 · 심층 분석",
+  "date": "202610.29.",
+  "author": {
+    "name": "@realestate_insights",
+    "avatar_letter": "R"
+  },
+  "tagline": "⚖️ 데이터 검증 · 극단 비교",
+  "slides": [
+    {
+      "slide_number": 1,
+      "total_slides": 5,
+      "type": "cover",
+      "tagline": "⚖️ 데이터 검증 · 극단 비교",
+      "headline_prefix": "당신의 보증금,",
+      "headline_highlight": "전세 계약 전 반드시 확인해야 할 3대 특약!",
+      "headline_suffix": "작은 실수가 큰 손실로!",
+      "image_caption": "전세 계약 시 필수 확인 사항",
+      "swipe_text": "밀어서 전체 리스트 확인",
+      "image_path": "outputs/261029_1325/assets/slide_01.png"
+    },
+    {
+      "slide_number": 2,
+      "total_slides": 5,
+      "type": "body_list",
+      "step_badge": "PART 01",
+      "title": "전세 계약 필수 특약",
+      "points": [
+        {
+          "number": 1,
+          "heading": "보증금 반환 특약",
+          "desc": "특약에 보증금 반환 조건을 명시하지 않으면, 전세 만료 시 보증금 손실 위험!"
+        },
+        {
+          "number": 2,
+          "heading": "주택 상태 보증",
+          "desc": "주택이 계약 시점과 동일한 조건에서 반환된다는 내용을 포함해야 피해를 줄일 수 있음."
+        },
+        {
+          "number": 3,
+          "heading": "임대료 인상 한도",
+          "desc": "임대료 인상에 대한 상한선을 설정하지 않으면, 예기치 못한 인상으로 재정적 부담이 커질 수 있음."
+        }
+      ]
+    },
+    {
+      "slide_number": 3,
+      "total_slides": 5,
+      "type": "body_list",
+      "step_badge": "CHECK 02",
+      "title": "보증금 미반환 시 대처 방안",
+      "points": [
+        {
+          "number": 1,
+          "heading": "서면 계약서 확인",
+          "desc": "계약 체결 후 서면으로 모든 규정을 명시하며 운영 계획을 철저히 검토해야 함."
+        },
+        {
+          "number": 2,
+          "heading": "법적 조치 준비",
+          "desc": "보증금 반환이 이루어지지 않을 경우 즉시 법적 절차를 준비하는 것이 중요함."
+        },
+        {
+          "number": 3,
+          "heading": "전문가 상담",
+          "desc": "상황에 따라 변호사 또는 부동산 전문가에게 상담하여 대처 방안을 마련해야 함."
+        }
+      ]
+    },
+    {
+      "slide_number": 4,
+      "total_slides": 5,
+      "type": "body_visual",
+      "step_badge": "SOLUTION 03",
+      "title": "전세 계약 시 필수 체크리스트",
+      "points": [
+        {
+          "number": 1,
+          "heading": "계약서에 특약 삽입",
+          "desc": "3대 필수 특약을 반드시 계약서에 포함시켜야 위험을 사전에 방지함."
+        },
+        {
+          "number": 2,
+          "heading": "상담과 검토",
+          "desc": "전문가와 상담하고 계약서 검토를 통해 추가적인 배제 조항을 놓치지 말 것."
+        },
+        {
+          "number": 3,
+          "heading": "위험 분석",
+          "desc": "각 특약의 중요성에 대해 깊이 있게 고민하고 계약 전 충분히 이해해야 함."
+        }
+      ],
+      "image_path": "outputs/261029_1325/assets/slide_04.png"
+    },
+    {
+      "slide_number": 5,
+      "total_slides": 5,
+      "type": "cta",
+      "summary_title": "오늘의 핵심 포인트 3줄 요약",
+      "summary_items": [
+        "전세 계약 시 필수 특약 확인!",
+        "국지적 피해를 방지하세요.",
+        "전문가 상담으로 안전한 계약."
+      ],
+      "action_title": "더 많은 꿀팁이 궁금하다면?",
+      "action_desc": "저장하고 매일 새로운 인사이트를 받아보세요!",
+      "icons": [
+        "저장하기",
+        "공유하기"
+      ]
+    }
+  ]
+}
