@@ -5,8 +5,13 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "render": "node scripts/render_cardnews.js",
-    "test": "node scripts/test_collectors.js"
+    "render": "node scripts/render_cards.js",
+    "smoke": "node scripts/smoke_render.js",
+    "clean:outputs": "node scripts/clean_outputs.js",
+    "test": "node scripts/test_collectors.js && node scripts/test_script_validator.js && node scripts/test_reels_analysis.js && node scripts/test_llm_client.js && node scripts/test_card_renderer.js && node scripts/test_stt_guard.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "keywords": [],
   "author": "",

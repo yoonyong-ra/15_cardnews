@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 의존성 설치
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+
+      - name: 문법 검사 (node --check)
+        run: |
+          for f in server.js engine/*.js collectors/*.js scripts/*.js public/app.js; do
+            node --check "$f"
+          done
+
+      - name: 단위 테스트
+        run: npm test
+
+      - name: Playwright Chromium 설치
+        run: npx playwright install --with-deps chromium
+
+      - name: 렌더 스모크 테스트 (API 키 불필요)
+        run: npm run smoke
