@@ -2,171 +2,41 @@
  * 5대 떡상 카드뉴스 공식 기반 자동 대본 생성기 & 릴스 URL 역분석 엔진
  */
 
+const { validateCardScript } = require('./script_validator');
+const { callChatCompletion } = require('./llm_client');
+
 function formatKstDate() {
   const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
   return `${kst.getUTCFullYear()}.${String(kst.getUTCMonth() + 1).padStart(2, '0')}.${String(kst.getUTCDate()).padStart(2, '0')}`;
 }
 
-// 5대 떡상 공식 템플릿 정의
-const VIRAL_FORMULAS = {
-  warning: {
-    name: "반전/경고형 (손실회피)",
-    description: "불안감 자극 ➔ 90%가 놓치는 치명적 실수 ➔ 팩트 ➔ 명쾌한 해결책",
-    build: (topic, details) => ({
-      formula: "warning",
-      tagline: "🚨 긴급 점검 · 손실 방지 가이드",
-      headline_prefix: "모르면 수천만 원 날립니다!",
-      headline_highlight: `${topic}`,
-      headline_suffix: "숨은 함정과 대처법",
-      slides: [
+/**
+ * 검증에 실패한 LLM 응답을 1회만 복구 요청한다. (추가 호출은 최대 1회)
+ */
+async function requestScriptRepair(openai, systemPrompt, userPrompt, brokenJson, errors) {
+  try {
+    console.warn(`[AI 대본 검증 실패 → 복구 요청] ${errors.join(' / ')}`);
+    const completion = await callChatCompletion(openai, {
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
         {
-          slide_number: 1,
-          total_slides: 4,
-          type: "cover",
-          tagline: "🚨 긴급 점검 · 손실 방지",
-          headline_prefix: "모르면 수천만 원 날립니다!",
-          headline_highlight: `${topic}`,
-          headline_suffix: "숨은 함정 총정리",
-          image_path: "../assets/cover_sample.jpg",
-          image_caption: "지금 당장 확인해야 할 필수 체크포인트",
-          swipe_text: "밀어서 피해 예방하기"
-        },
-        {
-          slide_number: 2,
-          total_slides: 4,
-          type: "body_list",
-          step_badge: "CRITICAL 01",
-          title: "많은 분들이 착각하는 치명적 오류 3가지",
-          points: [
-            {
-              number: "01",
-              heading: "기존 규정만 믿고 방심하는 경우",
-              desc: `${details.point1 || '바뀐 최신 기준을 확인하지 않아 청약 자격이 박탈되거나 대출이 거절될 수 있습니다.'}`
-            },
-            {
-              number: "02",
-              heading: "서류 및 소득 요건 산정 기준 오류",
-              desc: `${details.point2 || '맞벌이 및 부채 산정 시 새로운 스트레스 금리가 적용되어 한도가 축소됩니다.'}`
-            },
-            {
-              number: "03",
-              heading: "신청 일정 및 유예 기간 마감",
-              desc: `${details.point3 || '이번 달 내로 신청하지 않으면 강화된 규제를 그대로 적용받게 됩니다.'}`
-            }
-          ]
-        },
-        {
-          slide_number: 3,
-          total_slides: 4,
-          type: "body_visual",
-          step_badge: "SOLUTION 02",
-          title: "전문가가 권장하는 안전 대처 솔루션",
-          image_path: "../assets/doc_sample.jpg",
-          points: [
-            {
-              number: "KEY",
-              heading: "사전 모의계산 및 특약 문구 필수 기재",
-              desc: "계약서 작성 전 대출 사전 심사를 완료하고, 대출 불가 시 계약금 반환 특약을 반드시 명시하세요."
-            }
-          ]
-        },
-        {
-          slide_number: 4,
-          total_slides: 4,
-          type: "cta",
-          summary_title: "오늘의 핵심 안전 수칙 3가지",
-          summary_items: [
-            "달라진 최신 산정 기준 반드시 사전 점검",
-            "대출 한도 감소분 미리 계산하여 자금 계획 수립",
-            "계약서 작성 시 계약금 보호 안전 특약 명시"
-          ],
-          action_title: "손해보지 않는 부동산 재테크",
-          action_desc: "매일 아침 가장 빠르고 정확한 팩트를 전해드립니다.",
-          icons: ["게시물 저장하기", "가족/지인에게 공유"]
+          role: 'user',
+          content: `이전 응답이 아래 조건을 위반했습니다:\n- ${errors.join('\n- ')}\n\n` +
+            `원본 내용과 관점은 유지하고, 조건을 모두 만족하는 JSON만 다시 출력하세요.\n` +
+            `[이전 응답]\n${JSON.stringify(brokenJson).slice(0, 6000)}`
         }
-      ]
-    })
-  },
-
-  listicle: {
-    name: "요약/리스트형 (소장가치)",
-    description: "바쁜 현대인을 위한 핵심 3줄 요약 ➔ 저장 및 스크랩 극대화",
-    build: (topic, details) => ({
-      formula: "listicle",
-      tagline: "📋 핵심 요약 · 3분 브리핑",
-      headline_prefix: "이번 주 공식 발표!",
-      headline_highlight: `${topic}`,
-      headline_suffix: "딱 3가지만 기억하세요",
-      slides: [
-        {
-          slide_number: 1,
-          total_slides: 4,
-          type: "cover",
-          tagline: "📋 핵심 요약 · 3분 브리핑",
-          headline_prefix: "이번 주 공식 발표!",
-          headline_highlight: `${topic}`,
-          headline_suffix: "핵심 총정리",
-          image_path: "../assets/cover_sample.jpg",
-          image_caption: "시간 아껴주는 3분 완벽 가이드",
-          swipe_text: "밀어서 3분 요약 보기"
-        },
-        {
-          slide_number: 2,
-          total_slides: 4,
-          type: "body_list",
-          step_badge: "SUMMARY 01",
-          title: `${topic} 주요 변동 사항`,
-          points: [
-            {
-              number: "01",
-              heading: "적용 대상 및 자격 기준 확대",
-              desc: `${details.point1 || '실수요자 중심의 진입 문턱이 낮아져 기회가 대폭 증가했습니다.'}`
-            },
-            {
-              number: "02",
-              heading: "지원 혜택 및 인정 한도 상향",
-              desc: `${details.point2 || '월 인정 금액 및 금리 우대 폭이 기존 대비 크게 유리해졌습니다.'}`
-            },
-            {
-              number: "03",
-              heading: "시행 일정 및 신청 프로세스 간소화",
-              desc: `${details.point3 || '온라인 간편 접수가 도입되어 서류 제출 절차가 대폭 줄어들었습니다.'}`
-            }
-          ]
-        },
-        {
-          slide_number: 3,
-          total_slides: 4,
-          type: "body_visual",
-          step_badge: "ACTION 02",
-          title: "실전 적용: 오늘 당장 해야 할 행동",
-          image_path: "../assets/doc_sample.jpg",
-          points: [
-            {
-              number: "TIP",
-              heading: "공식 플랫폼에서 본인 자격 사전 조회",
-              desc: "청약홈 또는 은행 앱에서 완화된 자격 조건을 미리 등록해 두면 오픈 즉시 접수 가능합니다."
-            }
-          ]
-        },
-        {
-          slide_number: 4,
-          total_slides: 4,
-          type: "cta",
-          summary_title: "오늘의 핵심 포인트 3줄 요약",
-          summary_items: [
-            "자격 요건 완화로 수혜 대상 대폭 확대",
-            "인정 한도 증가로 조기 준비자에게 유리",
-            "사전 자격 확인 후 즉시 접수 준비 필수"
-          ],
-          action_title: "놓치면 아쉬운 알짜 재테크 정보",
-          action_desc: "유익하셨다면 팔로우하고 매일 새로운 소식을 받아보세요!",
-          icons: ["나중에 보려고 저장", "친구 태그하기"]
-        }
-      ]
-    })
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0
+    }, { timeout: 90000, retries: 1, label: 'AI 대본 복구' });
+    return JSON.parse(completion.choices[0]?.message?.content || '{}');
+  } catch (err) {
+    console.error('[AI 대본 복구 요청 실패]', err.message);
+    return null;
   }
-};
+}
 
 /**
  * 7대 떡상 관점 + 사용자 인터랙티브 피드백 기반 고급 카드뉴스 대본 생성기
@@ -267,28 +137,48 @@ async function generateAdvancedCardScript({
 - 이미지분석: ${coreContext.imageText || ''}
 `.trim();
 
-      const completion = await openai.chat.completions.create({
+      const completion = await callChatCompletion(openai, {
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
         response_format: { type: "json_object" }
-      });
+      }, { timeout: 120000, retries: 1, label: 'AI 대본' });
 
-      const parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
-      if (parsed && parsed.slides && parsed.slides.length > 0) {
+      let parsed = JSON.parse(completion.choices[0]?.message?.content || "{}");
+      let validation = validateCardScript(parsed, { slideCount: count, topic });
+      let repairedUsed = false;
+
+      // 형식이 깨진 응답은 1회만 복구 요청하고 다시 검증한다.
+      if (!validation.ok) {
+        const repaired = await requestScriptRepair(openai, systemPrompt, userPrompt, parsed, validation.errors);
+        if (repaired) {
+          parsed = repaired;
+          validation = validateCardScript(repaired, { slideCount: count, topic });
+          repairedUsed = true;
+        }
+      }
+
+      if (validation.ok) {
+        if (validation.warnings.length > 0) {
+          console.warn(`[AI 대본 검증 경고] ${validation.warnings.join(' / ')}`);
+        }
         return {
           project_title: `${topic} 카드뉴스`,
-          category: parsed.category || "부동산 핫이슈 · 분석",
+          category: typeof parsed.category === 'string' && parsed.category.trim() ? parsed.category.trim() : "부동산 핫이슈 · 분석",
           date: formatKstDate(),
           author: {
             name: "@realestate_insights",
             avatar_letter: "R"
           },
-          ...parsed
+          tagline: selectedMeta.tag,
+          validation: { ok: true, repaired: repairedUsed, warnings: validation.warnings },
+          slides: validation.slides
         };
       }
+
+      console.error(`[AI 대본 검증 실패, Fallback 전환] ${validation.errors.join(' / ')}`);
     } catch (err) {
       console.error(`[AI 대본 생성 실패, Fallback 전환]`, err.message);
     }
@@ -380,44 +270,138 @@ async function generateAdvancedCardScript({
 }
 
 /**
- * 하위 호환성을 위한 기본 대본 생성기
+ * 릴스/게시물 URL 역분석 — 실제 캡션·성과 지표를 근거로 구조를 분석한다.
+ * 수집에 실패했거나 캡션이 없으면 추측 결과를 만들지 않고 실패를 돌려준다.
  */
-function generateCardNewsScript(topic, summary, formulaType = 'warning', customDetails = {}) {
-  const formula = VIRAL_FORMULAS[formulaType] || VIRAL_FORMULAS.warning;
-  const built = formula.build(topic, {
-    point1: summary,
-    ...customDetails
-  });
+const REELS_ANGLE_IDS = [
+  'angle_warning', 'angle_cheat', 'angle_easy', 'angle_vs',
+  'angle_story', 'angle_target', 'angle_calc'
+];
+
+function cleanReelsText(value, max) {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function normalizeReelsAnalysis(parsed = {}) {
+  const hookPattern = cleanReelsText(parsed.hookPattern, 100);
+  const hookText = cleanReelsText(parsed.hookText, 160);
+  const pacing = cleanReelsText(parsed.pacing, 300);
+  const whyHot = cleanReelsText(parsed.whyHot, 300);
+  const advice = cleanReelsText(parsed.advice, 300);
+  const tactics = Array.isArray(parsed.tactics)
+    ? parsed.tactics.map(t => cleanReelsText(t, 140)).filter(Boolean).slice(0, 4)
+    : [];
+  const recommendedFormula = REELS_ANGLE_IDS.includes(parsed.recommendedFormula)
+    ? parsed.recommendedFormula
+    : 'angle_warning';
+
+  const missing = [];
+  if (!hookPattern && !hookText) missing.push('후킹 패턴/문장');
+  if (!pacing) missing.push('전개 구조');
+  if (!advice) missing.push('재해석 가이드');
+  if (missing.length > 0) {
+    return { ok: false, errors: missing };
+  }
 
   return {
-    project_title: `${topic} 카드뉴스`,
-    category: "부동산 핫이슈 · 분석",
-    date: formatKstDate(),
-    author: {
-      name: "@realestate_insights",
-      avatar_letter: "R"
-    },
-    ...built
+    ok: true,
+    value: {
+      hookPattern,
+      hookText,
+      extractedHook: hookPattern ? (hookText ? `${hookPattern} · "${hookText}"` : hookPattern) : `"${hookText}"`,
+      pacing,
+      whyHot,
+      advice,
+      tactics,
+      recommendedFormula,
+      basis: 'caption'
+    }
   };
 }
 
-/**
- * 레퍼런스 릴스 URL 역분석기
- */
-function analyzeReelsUrl(reelsUrl) {
-  return {
-    targetUrl: reelsUrl,
-    extractedHook: "의문형 + 손실회피 ('아직도 ~하고 계신가요?')",
-    pacing: "4장 구성 (표지 ➔ 문제 3가지 ➔ 해결책 1가지 ➔ 저장 유도 CTA)",
-    recommendedFormula: "angle_warning",
-    advice: "표지에서 질문을 던지고 2번째 장에서 구체적 수치(금액/퍼센트)를 제시하는 호흡이 좋습니다."
-  };
+async function analyzeReelsReference({ url, caption, author, likesCount, viewsCount, hasVideo }) {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey || !apiKey.trim() || apiKey.includes('your_openai_api_key')) {
+    return { success: false, error: 'OPENAI_API_KEY가 설정되지 않아 릴스 역분석을 실행할 수 없습니다.' };
+  }
+  if (!caption || caption.trim().length < 10) {
+    return {
+      success: false,
+      error: '게시물 캡션이 없거나 너무 짧아 분석할 텍스트가 없습니다. (비공개·삭제된 게시물이거나 캡션이 없는 릴스일 수 있습니다)'
+    };
+  }
+
+  const systemPrompt = `
+당신은 인스타그램 릴스·카드뉴스의 '떡상 구조'를 해부하는 콘텐츠 분석가입니다.
+제공된 캡션과 성과 지표만으로 이 게시물의 구성 전략을 추론해 JSON으로만 응답하세요.
+
+[규칙]
+- 캡션에 없는 사실·수치·사건을 지어내지 마세요. 추론한 내용은 추정임이 드러나게 쓰세요.
+- hookText는 캡션에 실제로 존재하는 문장을 그대로 인용하고, 없으면 빈 문자열로 두세요.
+- pacing은 이 캡션이 정보를 전개하는 순서를 3~5단계로 요약하세요. (예: "1) 손실 경고 → 2) 수치 제시 → 3) 체크리스트 → 4) 저장 유도")
+- recommendedFormula는 다음 7개 id 중 하나만 고르세요: ${REELS_ANGLE_IDS.join(', ')}
+- 모든 값은 한국어로 작성하세요.
+
+[응답 JSON]
+{
+  "hookPattern": "후킹 문법 요약 (예: 의문형 + 손실회피, 숫자 리스트 + 시간 약속)",
+  "hookText": "캡션에서 후킹 역할을 하는 실제 문장",
+  "pacing": "1) ... → 2) ... → 3) ...",
+  "whyHot": "반응을 얻었을 심리적 요인 (지표가 있으면 근거로 언급)",
+  "tactics": ["재현 가능한 구체적 전술 1", "전술 2"],
+  "recommendedFormula": "angle_warning",
+  "advice": "우리 카드뉴스로 재해석할 때의 방향 1~2문장"
+}
+`.trim();
+
+  const userPrompt = `
+[게시물 URL]: ${url}
+[작성자]: ${author || '(미상)'}
+[성과 지표]: ${Number.isFinite(likesCount) || Number.isFinite(viewsCount)
+    ? `좋아요 ${likesCount || 0}개 / 조회수 ${viewsCount || 0}회`
+    : '제공되지 않음'}
+[미디어 형태]: ${hasVideo ? '릴스 영상' : '이미지·카드뉴스'}
+[캡션]:
+${caption.slice(0, 4000)}
+`.trim();
+
+  try {
+    const OpenAI = require('openai');
+    const openai = new OpenAI({ apiKey: apiKey.trim() });
+
+    const completion = await callChatCompletion(openai, {
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.3
+    }, { timeout: 60000, retries: 1, label: '릴스 역분석' });
+
+    const parsed = JSON.parse(completion.choices[0]?.message?.content || '{}');
+    const normalized = normalizeReelsAnalysis(parsed);
+
+    if (!normalized.ok) {
+      console.warn(`[릴스 역분석] 응답 형식 부족: ${normalized.errors.join(' / ')}`);
+      return {
+        success: false,
+        error: `분석 결과 형식이 올바르지 않습니다 (누락: ${normalized.errors.join(', ')}). 다시 시도해주세요.`
+      };
+    }
+
+    return { success: true, analysis: normalized.value };
+  } catch (err) {
+    console.error('[릴스 역분석 오류]', err.message);
+    return { success: false, error: `릴스 역분석에 실패했습니다: ${err.message}` };
+  }
 }
 
 module.exports = {
-  VIRAL_FORMULAS,
-  generateCardNewsScript,
   generateAdvancedCardScript,
-  analyzeReelsUrl
+  analyzeReelsReference,
+  normalizeReelsAnalysis,
+  REELS_ANGLE_IDS
 };
 

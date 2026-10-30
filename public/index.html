@@ -171,7 +171,8 @@
         <div class="control-panel">
           <div>
             <h2 style="font-size: 18px; font-weight: 800; margin-bottom: 6px;">🎯 벤치마킹 릴스 URL 정밀 역분석</h2>
-            <p style="font-size: 13px; color: var(--text-muted);">터진 카드뉴스 릴스 URL을 입력하면 1장 후킹 문구, 본문 전개 호흡, CTA를 역분석하여 새로운 기획안으로 재해석합니다.</p>
+            <p style="font-size: 13px; color: var(--text-muted);">실제 게시물 캡션과 성과 지표를 수집해 후킹 패턴 · 전개 구조 · 재현 포인트를 분석합니다.</p>
+            <p style="font-size: 11px; color: var(--text-light); margin-top: 4px;">※ 분석 1회당 OpenAI gpt-4o-mini 1회 호출(크레딧 사용) · 영상 속 음성은 분석하지 않습니다.</p>
           </div>
           <div class="input-row">
             <input type="text" class="custom-input" id="reels-url-input" placeholder="https://www.instagram.com/reel/C8xyz... 인스타그램 릴스 URL 입력">
@@ -181,7 +182,7 @@
           </div>
 
           <div id="reels-analysis-result" style="display: none; background: var(--bg-surface-elevated); padding: 18px; border-radius: 12px; border: 1px solid var(--border-subtle); flex-direction: column; gap: 10px; margin-top: 12px;">
-            <div style="font-weight: 700; color: var(--accent-orange); font-size: 15px;">📊 역분석 완료</div>
+            <div id="reels-analysis-title" style="font-weight: 700; color: var(--accent-orange); font-size: 15px;">📊 역분석 완료</div>
             <div id="reels-analysis-content" style="font-size: 14px; line-height: 1.6; color: var(--text-main);"></div>
             <button class="action-collect-btn" id="apply-reels-btn" style="align-self: flex-start; margin-top: 6px;">
               이 구조로 카드뉴스 스튜디오에 담기 ➔
@@ -298,7 +299,7 @@
         <div id="images-preview" style="display: none;"></div>
 
         <button class="generate-btn" id="btn-render-cards" style="width: 100%; margin-top: 10px; background: linear-gradient(135deg, #D9532F 0%, #F59E0B 100%); box-shadow: 0 4px 14px rgba(217, 83, 47, 0.3);">
-          <span>🎨</span> 카드뉴스 PNG 4장 생성 (1080x1350)
+          <span>🎨</span> 카드뉴스 PNG 생성 (1080x1350)
         </button>
 
         <!-- Rendered Cards Gallery -->

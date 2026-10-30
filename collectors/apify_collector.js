@@ -99,6 +99,7 @@ async function fetchInstagramTopicTrends(topic = '청약') {
             commentsCount: item.commentsCount || (item.latestComments ? item.latestComments.length : 0),
             postedAt: item.timestamp || new Date().toISOString(),
             thumbnail: item.displayUrl || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=600&auto=format&fit=crop&q=80",
+            isSample: false,
             whyHot: whyHotText
           };
         });
@@ -240,6 +241,7 @@ async function fetchInstagramTopicTrends(topic = '청약') {
       commentsCount: Math.floor(s.likes / 25),
       postedAt: new Date().toISOString(),
       thumbnail: s.thumb,
+      isSample: true,
       whyHot: s.why
     }));
   }
@@ -333,7 +335,8 @@ async function fetchTargetAccountsReels(targetAccounts = ['@real_estate_king']) 
               videoUrl: vidUrl,
               imageUrls: imgList,
               postedAt: item.timestamp || new Date().toISOString(),
-              thumbnail: item.displayUrl || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&auto=format&fit=crop&q=80"
+              thumbnail: item.displayUrl || (item.images && item.images[0]) || "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=600&auto=format&fit=crop&q=80",
+              isSample: false
             };
           })
           .slice(0, 10);
@@ -364,6 +367,7 @@ async function fetchSingleInstagramPost(postUrl) {
     console.warn('[Apify] API 토큰이 없습니다. 기본 분석 데이터로 반환합니다.');
     return {
       success: false,
+      isSample: true,
       url: postUrl,
       caption: "인스타그램 릴스 레퍼런스",
       author: "@creator",
@@ -399,6 +403,7 @@ async function fetchSingleInstagramPost(postUrl) {
 
       return {
         success: true,
+        isSample: false,
         id: item.id || `reel_${Date.now()}`,
         url: item.url || postUrl,
         caption: cleanCaption || "인스타그램 릴스 원본 게시물",
@@ -418,6 +423,7 @@ async function fetchSingleInstagramPost(postUrl) {
 
   return {
     success: false,
+    isSample: true,
     url: postUrl,
     caption: "인스타그램 릴스 레퍼런스",
     author: "@creator",

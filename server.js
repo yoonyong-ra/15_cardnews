@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -5,14 +6,16 @@ const fs = require('fs');
 const OpenAI = require('openai');
 const { fetchInstagramTopicTrends, fetchTargetAccountsReels, fetchSingleInstagramPost } = require('./collectors/apify_collector');
 const { fetchAutoRealEstateNews } = require('./collectors/estate_collector');
-const { generateCardNewsScript, generateAdvancedCardScript, analyzeReelsUrl } = require('./engine/analyzer');
+const { generateAdvancedCardScript, analyzeReelsReference } = require('./engine/analyzer');
 const { transcribeReelsAudio, analyzeCardImages, generateMultimodalInsight } = require('./engine/multimodal_analyzer');
-const { buildCardThemeVars } = require('./engine/card_theme');
+const { renderCardsToFolder } = require('./engine/card_renderer');
 const { loadSettings, saveSettings } = require('./engine/settings_store');
-const { chromium } = require('playwright');
+const { withPage, closeBrowser } = require('./engine/browser_pool');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+const OUTPUTS_DIR = path.join(__dirname, 'outputs');
 
 app.use(cors());
 app.use(express.json());
@@ -42,8 +45,50 @@ const serverLocks = {
   accounts: false,
   estate: false,
   multimodal: false,
+  images: false,
   render: false
 };
+
+// 요청이 비정상 종료되어 락이 남아도 일정 시간 뒤 자동 해제한다.
+const LOCK_TTL_MS = Number(process.env.LOCK_TTL_MS || 15 * 60 * 1000);
+
+function acquireLock(name) {
+  if (serverLocks[name]) return null;
+  serverLocks[name] = true;
+
+  let released = false;
+  const timer = setTimeout(() => {
+    if (!released) {
+      console.warn(`[락] '${name}' 작업이 ${Math.round(LOCK_TTL_MS / 1000)}초를 넘겨 강제 해제했습니다.`);
+      release();
+    }
+  }, LOCK_TTL_MS);
+  if (typeof timer.unref === 'function') timer.unref();
+
+  function release() {
+    if (released) return;
+    released = true;
+    clearTimeout(timer);
+    serverLocks[name] = false;
+  }
+
+  return release;
+}
+
+/**
+ * 동일 작업 동시 실행을 막는 미들웨어. 응답이 끝나면 자동 해제된다.
+ */
+function singleFlight(name, message) {
+  return (req, res, next) => {
+    const release = acquireLock(name);
+    if (!release) {
+      return res.status(429).json({ error: message });
+    }
+    res.on('finish', release);
+    res.on('close', release);
+    next();
+  };
+}
 
 // 1. [Apify] 주제별 20개 핫트렌드 수집 API
 app.post('/api/collect/topic', async (req, res) => {
@@ -117,20 +162,24 @@ app.post('/api/collect/estate', async (req, res) => {
 });
 
 // 4. [멀티모달] 릴스 STT / 카드뉴스 이미지 분석 & 7대 관점 제안 API
-app.post('/api/analyze-multimodal', async (req, res) => {
+app.post('/api/analyze-multimodal', singleFlight('multimodal', '이미 멀티모달 분석 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.'), async (req, res) => {
   const { topic, caption, videoUrl, imageUrls, likesCount, viewsCount } = req.body;
   console.log(`[API] 멀티모달 정밀 분석 요청: topic='${topic}' | video=${!!videoUrl} | images=${(imageUrls || []).length}장`);
 
   let audioText = null;
+  let sttError = null;
   if (videoUrl) {
     const sttRes = await transcribeReelsAudio(videoUrl);
     if (sttRes.success) audioText = sttRes.text;
+    else sttError = sttRes.message || '음성 전사를 건너뛰었습니다.';
   }
 
   let imageText = null;
+  let visionError = null;
   if (imageUrls && imageUrls.length > 0) {
     const visionRes = await analyzeCardImages(imageUrls);
     if (visionRes.success) imageText = visionRes.text;
+    else visionError = visionRes.message || '이미지 텍스트 추출을 건너뛰었습니다.';
   }
 
   const insight = await generateMultimodalInsight({
@@ -145,6 +194,8 @@ app.post('/api/analyze-multimodal', async (req, res) => {
     success: true,
     audioText,
     imageText,
+    sttError,
+    visionError,
     ...insight
   });
 });
@@ -169,43 +220,56 @@ app.post('/api/generate-advanced-script', async (req, res) => {
   res.json({ success: true, script });
 });
 
-// 6. [인스타 릴스] 릴스 URL 정밀 역분석 API (Apify 실시간 연동)
+// 6. [인스타 릴스] 릴스 URL 정밀 역분석 API (Apify 수집 + 실제 캡션 기반 GPT 분석)
+const INSTAGRAM_POST_URL = /^https?:\/\/(www\.)?instagram\.com\/(reel|reels|p|tv)\/[A-Za-z0-9_-]+/;
+
 app.post('/api/analyze-reels', async (req, res) => {
-  const { url } = req.body;
+  const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
   if (!url) {
-    return res.status(400).json({ error: '릴스 URL을 입력해주세요.' });
+    return res.status(400).json({ success: false, error: '릴스 URL을 입력해주세요.' });
+  }
+  if (!INSTAGRAM_POST_URL.test(url)) {
+    return res.status(400).json({
+      success: false,
+      error: '인스타그램 릴스·게시물 URL 형식이 아닙니다. (예: https://www.instagram.com/reel/XXXX/)'
+    });
   }
   console.log(`[API] 릴스 URL 떡상 역분석 (Apify 연동): ${url}`);
 
+  let postData = null;
   try {
-    // 1. Apify를 통해 실제 릴스 게시물 데이터 스크래핑
-    const postData = await fetchSingleInstagramPost(url);
-    
-    // 2. 캡션 내용을 기반으로 한 역분석 수행
-    const analysis = analyzeReelsUrl(url);
-
-    // 3. 실제 캡션이 수집되었으면 분석 결과 보강
-    if (postData && postData.caption && postData.caption !== "인스타그램 릴스 레퍼런스") {
-      const firstLine = postData.caption.split('\n')[0].trim();
-      if (firstLine.length > 5) {
-        analysis.extractedHook = `실제 릴스 1장 후킹: "${firstLine.slice(0, 40)}..."`;
-      }
-      analysis.caption = postData.caption;
-      analysis.author = postData.author;
-      analysis.likesCount = postData.likesCount;
-      analysis.viewsCount = postData.viewsCount;
-    }
-
-    res.json({ 
-      success: true, 
-      analysis, 
-      postData 
-    });
+    postData = await fetchSingleInstagramPost(url);
   } catch (err) {
-    console.error('[API 릴스 역분석 오류]', err.message);
-    const analysis = analyzeReelsUrl(url);
-    res.json({ success: true, analysis, postData: null });
+    console.error('[API 릴스 역분석 수집 오류]', err.message);
   }
+
+  // 수집 실패·샘플 폴백 상태에서는 추측 분석을 만들지 않는다.
+  if (!postData || postData.success === false || postData.isSample) {
+    return res.status(502).json({
+      success: false,
+      isSample: Boolean(postData && postData.isSample),
+      error: '게시물을 실제로 수집하지 못했습니다. APIFY_TOKEN 설정과 게시물 공개 여부를 확인해주세요. (수집 실패 시 임의 분석 결과를 생성하지 않습니다)'
+    });
+  }
+
+  const result = await analyzeReelsReference({
+    url: postData.url || url,
+    caption: typeof postData.caption === 'string' ? postData.caption : '',
+    author: postData.author,
+    likesCount: postData.likesCount,
+    viewsCount: postData.viewsCount,
+    hasVideo: Boolean(postData.isVideo || postData.videoUrl)
+  });
+
+  if (!result.success) {
+    return res.status(422).json({ success: false, error: result.error });
+  }
+
+  res.json({
+    success: true,
+    analysis: result.analysis,
+    postData: { ...postData, url: postData.url || url }
+  });
 });
 
 /**
@@ -234,6 +298,26 @@ function getFormattedTimestampFolder() {
   }
 
   return finalName;
+}
+
+/**
+ * 클라이언트가 보낸 폴더명을 outputs/ 하위 디렉터리로만 해석한다.
+ * '../..' 같은 값이 들어오면 프로젝트 밖에 파일을 쓰게 되므로 화이트리스트로 막는다.
+ */
+function resolveOutputFolder(folderName) {
+  const name = typeof folderName === 'string' ? folderName.trim() : '';
+  if (!/^[0-9A-Za-z_-]{4,32}$/.test(name)) {
+    const err = new Error('저장 폴더명이 올바르지 않습니다. (영문·숫자·-·_ 4~32자)');
+    err.status = 400;
+    throw err;
+  }
+  const dir = path.resolve(OUTPUTS_DIR, name);
+  if (path.dirname(dir) !== path.resolve(OUTPUTS_DIR)) {
+    const err = new Error('저장 경로가 outputs 디렉터리를 벗어났습니다.');
+    err.status = 400;
+    throw err;
+  }
+  return { name, dir };
 }
 
 // 7. [자료수집 완료] 원본 + STT + 4대 분석 + 재해석 + 대본 종합 Markdown 저장 API
@@ -267,7 +351,9 @@ app.post('/api/save-report', async (req, res) => {
 - **출처 / 계정:** ${topicData.source || '(미상)'}
 - **미디어 유형:** ${topicData.mediaType === 'reel' ? '🎬 인스타 릴스 영상' : topicData.mediaType === 'cardnews' ? '📑 카드뉴스 이미지' : '⚡ 부동산·시사·재테크 팩트 브리핑'}
 - **손실회피 적합도:** ${typeof topicData.walletScore === 'number' ? `${topicData.walletScore}점 (${topicData.relevance || '참고'})` : '미산정'}
-- **성과 지표:** 좋아요 ${topicData.likesCount?.toLocaleString() || 0}개 / 조회수 ${topicData.viewsCount?.toLocaleString() || 0}회
+- **성과 지표:** ${Number.isFinite(topicData.likesCount) || Number.isFinite(topicData.viewsCount)
+      ? `좋아요 ${Number(topicData.likesCount || 0).toLocaleString()}개 / 조회수 ${Number(topicData.viewsCount || 0).toLocaleString()}회`
+      : '제공되지 않음 (뉴스 기사)'}
 - **원본 바로가기:** [원문 링크](${topicData.url || '#'})
 
 ---
@@ -383,26 +469,31 @@ function buildSlideImagePrompt(slide, script) {
 async function createDryRunImage(filePath, slide) {
   const label = String(slide.image_caption || slide.title || 'PREVIEW')
     .replace(/&/g, '&amp;').replace(/</g, '&lt;');
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage({ viewport: { width: 1024, height: 1536 } });
-  await page.setContent(`
-    <html><body style="margin:0;width:1024px;height:1536px;display:flex;flex-direction:column;justify-content:flex-end;padding:64px;box-sizing:border-box;background:linear-gradient(140deg,#F1EDE4 0%,#D8CFC0 100%);font-family:sans-serif;">
-      <div style="font-size:22px;letter-spacing:.16em;color:#D9532F;font-weight:700;">DRY RUN · NO API CALL</div>
-      <div style="font-size:44px;line-height:1.3;color:#191A1E;font-weight:800;margin-top:18px;">${label}</div>
-    </body></html>
-  `);
-  await page.screenshot({ path: filePath });
-  await browser.close();
+  await withPage({ viewport: { width: 1024, height: 1536 } }, async (page) => {
+    await page.setContent(`
+      <html><body style="margin:0;width:1024px;height:1536px;display:flex;flex-direction:column;justify-content:flex-end;padding:64px;box-sizing:border-box;background:linear-gradient(140deg,#F1EDE4 0%,#D8CFC0 100%);font-family:sans-serif;">
+        <div style="font-size:22px;letter-spacing:.16em;color:#D9532F;font-weight:700;">DRY RUN · NO API CALL</div>
+        <div style="font-size:44px;line-height:1.3;color:#191A1E;font-weight:800;margin-top:18px;">${label}</div>
+      </body></html>
+    `);
+    await page.screenshot({ path: filePath });
+  });
 }
 
-app.post('/api/generate-images', async (req, res) => {
+app.post('/api/generate-images', singleFlight('images', '이미 AI 이미지 생성 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.'), async (req, res) => {
   const { script, folderName, dryRun } = req.body || {};
   if (!script || !Array.isArray(script.slides)) {
     return res.status(400).json({ error: '올바른 대본 데이터가 필요합니다.' });
   }
 
-  const folder = folderName || getFormattedTimestampFolder();
-  const targetDir = path.join(__dirname, 'outputs', folder);
+  let folderInfo;
+  try {
+    folderInfo = resolveOutputFolder(folderName || getFormattedTimestampFolder());
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
+  }
+  const folder = folderInfo.name;
+  const targetDir = folderInfo.dir;
   const assetsDir = path.join(targetDir, 'assets');
   fs.mkdirSync(assetsDir, { recursive: true });
 
@@ -484,226 +575,73 @@ app.post('/api/generate-images', async (req, res) => {
   res.json({ success: true, folder, generated, script, errors });
 });
 
-// 8. 카드뉴스 무손실 1080x1350 PNG 렌더링 API
-function formatCardDate(value) {
-  if (typeof value === 'string') {
-    const match = value.match(/(20\d{2})\D{0,2}(\d{1,2})\D{0,2}(\d{1,2})/);
-    if (match) {
-      return `${match[1]}.${String(match[2]).padStart(2, '0')}.${String(match[3]).padStart(2, '0')}`;
-    }
-    const digits = value.replace(/\D/g, '');
-    if (digits.length === 8) {
-      return `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)}`;
-    }
-  }
-  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
-  return `${kst.getUTCFullYear()}.${String(kst.getUTCMonth() + 1).padStart(2, '0')}.${String(kst.getUTCDate()).padStart(2, '0')}`;
-}
-
-function resolveSlideImage(slide, outputDir) {
-  const assetsDir = path.join(outputDir, 'assets');
-  const candidates = [];
-
-  if (slide.image_path) {
-    if (/^https?:\/\//.test(slide.image_path)) return slide.image_path;
-    candidates.push(path.isAbsolute(slide.image_path) ? slide.image_path : path.join(__dirname, slide.image_path));
-  }
-
-  const n = slide.slide_number;
-  const pad = String(n).padStart(2, '0');
-  const names = n === 1
-    ? ['cover.jpg', 'cover.png', `slide1.jpg`, `slide1.png`, `slide_${pad}.jpg`, `slide_${pad}.png`]
-    : [`slide${n}.jpg`, `slide${n}.png`, `slide_${pad}.jpg`, `slide_${pad}.png`];
-
-  for (const name of names) candidates.push(path.join(assetsDir, name));
-
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return `file://${candidate.replace(/\\/g, '/')}`;
-  }
-  return '';
-}
-
-app.post('/api/render', async (req, res) => {
-  const { script, folderName: customFolder, theme } = req.body;
-  if (!script || !script.slides) {
+// 8. 카드뉴스 무손실 1080x1350 PNG 렌더링 API (렌더 로직은 engine/card_renderer.js 단일 구현)
+app.post('/api/render', singleFlight('render', '이미 카드뉴스 렌더링 작업이 진행 중입니다. 잠시 후 다시 시도해주세요.'), async (req, res) => {
+  const { script, folderName: customFolder, theme } = req.body || {};
+  if (!script || !Array.isArray(script.slides) || script.slides.length === 0) {
     return res.status(400).json({ error: '올바른 대본 데이터가 필요합니다.' });
   }
 
-  const themeVars = buildCardThemeVars(theme);
-
-  const folderName = customFolder || getFormattedTimestampFolder();
-  const targetOutputDir = path.join(__dirname, 'outputs', folderName);
-  const cardsDir = path.join(targetOutputDir, 'cards');
-  fs.mkdirSync(path.join(targetOutputDir, 'assets'), { recursive: true });
-  fs.mkdirSync(cardsDir, { recursive: true });
-
-  const templatePath = path.resolve(__dirname, 'templates/card_template.html');
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: { width: 1080, height: 1350 },
-    deviceScaleFactor: 2
-  });
-  const page = await context.newPage();
-
-  const generatedImages = [];
-  const cardDate = formatCardDate(script.date);
-
-  for (const [idx, slide] of script.slides.entries()) {
-    const slideNumber = slide.slide_number || idx + 1;
-    const pageNum = String(slideNumber).padStart(2, '0');
-    const totalPages = String(script.slides.length).padStart(2, '0');
-    const slideForRender = { ...slide, slide_number: slideNumber, total_slides: script.slides.length, render_image: resolveSlideImage({ ...slide, slide_number: slideNumber }, targetOutputDir) };
-
-    await page.goto(`file://${templatePath}`);
-
-    await page.evaluate(({ data, slide, pageNum, totalPages, themeVars, cardDate }) => {
-      Object.entries(themeVars || {}).forEach(([key, value]) => {
-        document.documentElement.style.setProperty(key, value);
-      });
-
-      document.getElementById('category-text').innerText = data.category || '부동산 · 시사 · 재테크';
-      document.getElementById('date-text').innerText = cardDate;
-      document.getElementById('handle-text').innerText = data.author?.name || '@2839.studio';
-      document.getElementById('avatar-text').innerText = data.author?.avatar_letter || '2';
-      document.getElementById('page-text').innerText = `${pageNum} / ${totalPages}`;
-
-      const visualInner = slide.render_image
-        ? `<img src="${slide.render_image}" alt="Visual">`
-        : `<div class="visual-placeholder">
-             <div class="vp-tag">${slide.step_badge || (slide.type === 'cover' ? 'KEY VISUAL' : 'DATA POINT')}</div>
-             <div class="vp-text">${slide.image_caption || slide.title || ''}</div>
-           </div>`;
-
-      const coverLen = `${slide.headline_prefix || ''}${slide.headline_highlight || ''}${slide.headline_suffix || ''}`.length;
-      const coverSize = coverLen > 44 ? 46 : coverLen > 32 ? 54 : 64;
-      const titleLen = (slide.title || '').length;
-      const bodyTitleSize = titleLen > 28 ? 38 : titleLen > 20 ? 43 : 48;
-
-      const container = document.getElementById('slide-content-container');
-      container.innerHTML = '';
-
-      if (slide.type === 'cover') {
-        container.innerHTML = `
-          <div class="content-cover">
-            <div class="cover-tagline">${slide.tagline || ''}</div>
-            <h1 class="cover-headline" style="font-size: ${coverSize}px;">
-              ${slide.headline_prefix || ''} <br>
-              <span class="highlight">${slide.headline_highlight || ''}</span> ${slide.headline_suffix || ''}
-            </h1>
-            <div class="cover-visual-card">
-              ${visualInner}
-              ${slide.render_image ? `<div class="cover-visual-overlay">
-                <div class="cover-visual-caption">${slide.image_caption || ''}</div>
-              </div>` : ''}
-            </div>
-            <div class="swipe-hint">
-              <span>${slide.swipe_text || '밀어서 계속 보기'}</span>
-              <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-            </div>
-          </div>
-        `;
-      } else if (slide.type === 'body_list') {
-        const points = Array.isArray(slide.points) ? slide.points : [];
-        const pointsHtml = points.map(p => `
-          <div class="point-card">
-            <div class="point-number">${p.number}</div>
-            <div class="point-content">
-              <div class="point-heading">${p.heading}</div>
-              <div class="point-desc">${p.desc}</div>
-            </div>
-          </div>
-        `).join('');
-
-        container.innerHTML = `
-          <div class="content-body">
-            <div class="body-title-wrap">
-              <div class="body-step-badge">${slide.step_badge || 'SUMMARY'}</div>
-              <h2 class="body-title" style="font-size: ${bodyTitleSize}px;">${slide.title}</h2>
-            </div>
-            <div class="point-cards-list">
-              ${pointsHtml}
-            </div>
-          </div>
-        `;
-      } else if (slide.type === 'body_visual') {
-        const points = Array.isArray(slide.points) ? slide.points : [];
-        const pointsHtml = points.map(p => `
-          <div class="point-card" style="padding: 22px 28px;">
-            <div class="point-number" style="background: var(--accent-blue-soft); color: var(--accent-blue);">${p.number}</div>
-            <div class="point-content">
-              <div class="point-heading" style="font-size: 26px;">${p.heading}</div>
-              <div class="point-desc" style="font-size: 22px;">${p.desc}</div>
-            </div>
-          </div>
-        `).join('');
-
-        container.innerHTML = `
-          <div class="content-body">
-            <div class="body-title-wrap">
-              <div class="body-step-badge">${slide.step_badge || 'ACTION'}</div>
-              <h2 class="body-title" style="font-size: ${bodyTitleSize}px;">${slide.title}</h2>
-            </div>
-            <div class="cover-visual-card" style="height: 380px;">
-              ${visualInner}
-            </div>
-            <div class="point-cards-list">
-              ${pointsHtml}
-            </div>
-          </div>
-        `;
-      } else if (slide.type === 'cta') {
-        const summaryItems = Array.isArray(slide.summary_items) ? slide.summary_items : [];
-        const icons = Array.isArray(slide.icons) ? slide.icons : ['게시물 저장하기', '지인에게 공유하기'];
-        const pickIcon = (label) => {
-          if (/공유|태그|보내|전송|링크/.test(label)) return '📤';
-          if (/저장|소장|북마크|보관/.test(label)) return '💾';
-          if (/팔로우|구독/.test(label)) return '➕';
-          if (/댓글|의견/.test(label)) return '💬';
-          return '✅';
-        };
-        const listHtml = summaryItems.map(item => `<li>${item}</li>`).join('');
-        const iconsHtml = icons.map(icon => `<div class="cta-icon-item">${pickIcon(icon)} ${icon}</div>`).join('');
-
-        container.innerHTML = `
-          <div class="content-cta">
-            <div class="cta-summary-box">
-              <div class="cta-summary-title">📌 ${slide.summary_title}</div>
-              <ul class="cta-summary-list">
-                ${listHtml}
-              </ul>
-            </div>
-            <div class="cta-action-box">
-              <div class="cta-action-title">${slide.action_title}</div>
-              <div class="cta-action-desc">${slide.action_desc}</div>
-              <div class="cta-icons-row">
-                ${iconsHtml}
-              </div>
-            </div>
-          </div>
-        `;
-      }
-    }, { data: script, slide: slideForRender, pageNum, totalPages, themeVars, cardDate });
-
-    await page.waitForTimeout(400);
-
-    const filename = `slide_${pageNum}.png`;
-    const outputFilePath = path.join(cardsDir, filename);
-    await page.screenshot({ path: outputFilePath, clip: { x: 0, y: 0, width: 1080, height: 1350 } });
-
-    generatedImages.push(`/outputs/${folderName}/cards/${filename}`);
+  let folderInfo;
+  try {
+    folderInfo = resolveOutputFolder(customFolder || getFormattedTimestampFolder());
+  } catch (err) {
+    return res.status(400).json({ error: err.message });
   }
 
-  await browser.close();
-
-  fs.writeFileSync(path.join(targetOutputDir, 'script.json'), JSON.stringify(script, null, 2));
-
-  res.json({
-    success: true,
-    folder: folderName,
-    images: generatedImages
-  });
+  try {
+    const result = await renderCardsToFolder({
+      script,
+      folderName: folderInfo.name,
+      folderDir: folderInfo.dir,
+      theme
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('[API 렌더 오류]', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
+  const openaiReady = Boolean(
+    process.env.OPENAI_API_KEY &&
+    process.env.OPENAI_API_KEY.trim() &&
+    !process.env.OPENAI_API_KEY.includes('your_openai_api_key')
+  );
+  const apifyReady = Boolean(process.env.APIFY_TOKEN && process.env.APIFY_TOKEN.trim());
+
   console.log(`🚀 [서버] 업데이트 완료: http://localhost:${PORT}`);
+  console.log(`[서버] OPENAI_API_KEY ${openaiReady ? '설정됨' : '미설정 — 분석/대본은 폴백으로 동작하고 이미지 생성은 불가합니다'}`);
+  console.log(`[서버] APIFY_TOKEN ${apifyReady ? '설정됨' : '미설정 — 실시간 수집 대신 샘플 데이터가 표시됩니다'}`);
+});
+
+async function shutdown(signal) {
+  console.log(`[서버] ${signal} 수신 → 브라우저를 정리하고 종료합니다.`);
+  await closeBrowser();
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(0), 5000).unref();
+}
+
+['SIGINT', 'SIGTERM'].forEach(signal => {
+  process.on(signal, () => { shutdown(signal); });
+});
+
+// 존재하지 않는 API 경로는 HTML 대신 JSON으로 응답한다.
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: '존재하지 않는 API 경로입니다.' });
+});
+
+// 라우트에서 던진 오류(비동기 포함)를 항상 JSON으로 변환한다.
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err);
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) {
+    console.error('[서버 오류]', err.stack || err.message || err);
+  } else {
+    console.warn(`[요청 오류 ${status}]`, err.message);
+  }
+  res.status(status).json({
+    error: status >= 500 ? '서버 내부 오류가 발생했습니다.' : (err.message || '요청을 처리할 수 없습니다.')
+  });
 });

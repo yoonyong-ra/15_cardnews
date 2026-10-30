@@ -1,6 +1,5 @@
 // State Management
 let selectedTopicData = null;
-let selectedFormula = 'warning';
 let topicPosts = [];
 let best5Posts = [];
 let accountPosts = [];
@@ -36,15 +35,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
   });
 });
 
-// Formula Selection
-document.querySelectorAll('.formula-option').forEach(opt => {
-  opt.addEventListener('click', () => {
-    document.querySelectorAll('.formula-option').forEach(o => o.classList.remove('active'));
-    opt.classList.add('active');
-    selectedFormula = opt.getAttribute('data-formula');
-  });
-});
-
 // Global Lock State
 let isGlobalBusy = false;
 
@@ -71,6 +61,22 @@ function startCooldown(btn, originalHtml, cooldownSec = 3) {
       isGlobalBusy = false;
     }
   }, 1000);
+}
+
+/**
+ * 샘플(예시) 데이터 배지 — Apify 수집 실패/토큰 미설정 시 실제 게시물로 오인하지 않도록 표시한다.
+ */
+const SAMPLE_BADGE_HTML = '<span class="media-badge" style="background: rgba(251, 191, 36, 0.18); color: #FBBF24; border: 1px solid rgba(251, 191, 36, 0.35);" title="Apify 수집 실패 또는 APIFY_TOKEN 미설정으로 생성된 예시 데이터입니다">🧪 샘플</span>';
+
+function sampleBadge(item) {
+  return item && item.isSample ? SAMPLE_BADGE_HTML : '';
+}
+
+function sampleNoticeHtml(sampleCount, total) {
+  if (!sampleCount) return '';
+  return `<div style="grid-column: 1 / -1; padding: 10px 14px; border-radius: 10px; border: 1px solid rgba(251, 191, 36, 0.35); background: rgba(251, 191, 36, 0.08); color: #FBBF24; font-size: 12px; font-weight: 700; line-height: 1.5;">
+    🧪 샘플 데이터 ${sampleCount}/${total}건 · Apify 수집에 실패했거나 APIFY_TOKEN이 설정되지 않아 예시 게시물로 표시됩니다. 실제 인스타그램 게시물 분석 결과가 아닙니다.
+  </div>`;
 }
 
 /**
@@ -128,7 +134,7 @@ async function collectTopicTrends() {
     if (topicPosts.length === 0) {
       topicContainer.innerHTML = '<div style="padding: 30px; color: var(--text-muted); text-align: center;">어제 0시 이후 올라온 게시물이 없습니다.</div>';
     } else {
-      topicContainer.innerHTML = topicPosts.map(p => {
+      topicContainer.innerHTML = sampleNoticeHtml(topicPosts.filter(p => p.isSample).length, topicPosts.length) + topicPosts.map(p => {
         const titleText = cleanDisplayTitle(p.caption);
         const isReel = p.isVideo || !!p.videoUrl;
         const mediaBadge = isReel 
@@ -136,21 +142,22 @@ async function collectTopicTrends() {
           : '<span class="media-badge cardnews">📑 카드뉴스</span>';
 
         return `
-          <div class="feed-card" onclick="selectPost('${p.id}', 'topic')">
+          <div class="feed-card" onclick="selectPost('${escapeHtml(p.id)}', 'topic')">
             <div>
               <div class="card-top-meta">
                 <div class="card-top-left">
-                  <span class="card-tag">${p.topBadge}</span>
+                  <span class="card-tag">${escapeHtml(p.topBadge)}</span>
                   ${mediaBadge}
+                  ${sampleBadge(p)}
                 </div>
-                <a href="${p.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();" title="인스타그램에서 원본 게시물 보기">🔗 원본 보기 ↗</a>
+                <a href="${escapeHtml(p.url)}" target="_blank" class="origin-link" onclick="event.stopPropagation();" title="인스타그램에서 원본 게시물 보기">🔗 원본 보기 ↗</a>
               </div>
-              <div class="card-title" title="${p.caption.replace(/"/g, '&quot;')}">${titleText}</div>
-              <div class="card-snippet">🔥 ${p.whyHot}</div>
+              <div class="card-title" title="${escapeHtml(p.caption)}">${escapeHtml(titleText)}</div>
+              <div class="card-snippet">🔥 ${escapeHtml(p.whyHot)}</div>
             </div>
             <div class="card-footer-meta">
-              <span style="color: var(--accent-orange); font-weight: 700; font-size: 13px;">❤️ ${p.likesCount.toLocaleString()}</span>
-              <span style="font-size: 11px; color: var(--text-muted);">${p.author}</span>
+              <span style="color: var(--accent-orange); font-weight: 700; font-size: 13px;">❤️ ${Number(p.likesCount || 0).toLocaleString()}</span>
+              <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.author)}</span>
             </div>
           </div>
         `;
@@ -173,7 +180,7 @@ function renderBest5Cards() {
   }
 
   best5Section.style.display = 'block';
-  best5Container.innerHTML = best5Posts.map(p => {
+  best5Container.innerHTML = sampleNoticeHtml(best5Posts.filter(p => p.isSample).length, best5Posts.length) + best5Posts.map(p => {
     const titleText = cleanDisplayTitle(p.caption);
     const isReel = p.isVideo || !!p.videoUrl;
     const mediaBadge = isReel
@@ -182,24 +189,25 @@ function renderBest5Cards() {
     const selected = selectedBestIds.has(p.id);
 
     return `
-      <div class="feed-card ${selected ? 'batch-selected' : ''}" data-post-id="${p.id}" style="border-color: var(--accent-orange); background: linear-gradient(180deg, #221815 0%, var(--bg-surface) 100%);" onclick="selectPost('${p.id}', 'topic')">
+      <div class="feed-card ${selected ? 'batch-selected' : ''}" data-post-id="${escapeHtml(p.id)}" style="border-color: var(--accent-orange); background: linear-gradient(180deg, #221815 0%, var(--bg-surface) 100%);" onclick="selectPost('${escapeHtml(p.id)}', 'topic')">
         <div>
           <div class="card-top-meta">
             <div class="card-top-left">
               <label class="batch-check" title="일괄 생성 선택" onclick="event.stopPropagation()">
-                <input type="checkbox" ${selected ? 'checked' : ''} onchange="toggleBestSelection('${p.id}', this.checked)">
+                <input type="checkbox" ${selected ? 'checked' : ''} onchange="toggleBestSelection('${escapeHtml(p.id)}', this.checked)">
               </label>
-              <span class="card-tag" style="background: var(--accent-orange); color: #fff;">${p.topBadge}</span>
+              <span class="card-tag" style="background: var(--accent-orange); color: #fff;">${escapeHtml(p.topBadge)}</span>
               ${mediaBadge}
+              ${sampleBadge(p)}
             </div>
-            <a href="${p.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();" title="인스타그램에서 원본 게시물 보기">🔗 원본 보기 ↗</a>
+            <a href="${escapeHtml(p.url)}" target="_blank" class="origin-link" onclick="event.stopPropagation();" title="인스타그램에서 원본 게시물 보기">🔗 원본 보기 ↗</a>
           </div>
-          <div class="card-title" title="${p.caption.replace(/"/g, '&quot;')}">${titleText}</div>
-          <div class="card-snippet">🔥 ${p.whyHot}</div>
+          <div class="card-title" title="${escapeHtml(p.caption)}">${escapeHtml(titleText)}</div>
+          <div class="card-snippet">🔥 ${escapeHtml(p.whyHot)}</div>
         </div>
         <div class="card-footer-meta">
-          <span style="color: var(--accent-orange); font-weight: 800; font-size: 13px;">❤️ ${p.likesCount.toLocaleString()}</span>
-          <span style="font-size: 11px; color: var(--text-muted);">${p.author}</span>
+          <span style="color: var(--accent-orange); font-weight: 800; font-size: 13px;">❤️ ${Number(p.likesCount || 0).toLocaleString()}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.author)}</span>
         </div>
       </div>
     `;
@@ -248,8 +256,14 @@ async function postJson(url, body) {
   return data;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
 function escapeBatchText(value) {
-  return String(value || '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  return escapeHtml(value);
 }
 
 function appendBatchLog(html) {
@@ -336,7 +350,8 @@ async function generateOnePost(post, index, total) {
     theme: getCardTheme()
   });
 
-  appendBatchLog(`&nbsp;&nbsp;✅ 완료 · ${renderRes.images.length}장 PNG · ${imageNote} · <a href="${renderRes.images[0]}" target="_blank" style="color:#A5B4FC;">첫 장 보기 ↗</a>`);
+  const fontNote = renderRes.warnings?.length ? ` · ⚠️ 폰트 대체(${renderRes.warnings.join(',')})` : '';
+  appendBatchLog(`&nbsp;&nbsp;✅ 완료 · ${renderRes.images.length}장 PNG · ${imageNote}${fontNote} · <a href="${escapeHtml(renderRes.images[0])}" target="_blank" style="color:#A5B4FC;">첫 장 보기 ↗</a>`);
   return { title, folder: saveRes.folderName, images: renderRes.images, imageNote };
 }
 
@@ -346,8 +361,10 @@ async function runBatchGeneration() {
   const posts = best5Posts.filter(p => selectedBestIds.has(p.id));
   if (posts.length === 0) return;
 
+  const sampleCount = posts.filter(p => p.isSample).length;
   const confirmed = confirm(
     `선택한 ${posts.length}개 항목을 일괄 생성합니다.\n\n` +
+    (sampleCount > 0 ? `⚠️ 샘플 데이터 ${sampleCount}개가 포함되어 있습니다. 실제 인스타그램 게시물 분석이 아닙니다.\n\n` : '') +
     '항목마다 딥분석 → 대본 생성 → 리포트 저장 → AI 이미지 생성 → PNG 렌더가 순서대로 실행됩니다.\n' +
     'OpenAI 크레딧이 사용됩니다. 계속할까요?'
   );
@@ -430,22 +447,25 @@ function renderAccountCards(posts) {
   }
   accountsContainer.innerHTML = posts.map(p => {
     const titleText = cleanDisplayTitle(p.caption);
+    const views = Number(p.viewsCount || 0).toLocaleString();
+    const likes = Number(p.likesCount || 0).toLocaleString();
     return `
-      <div class="feed-card" onclick="selectPost('${p.id}', 'account')">
+      <div class="feed-card" onclick="selectPost('${escapeHtml(p.id)}', 'account')">
         <div>
           <div class="card-top-meta">
             <div class="card-top-left">
-              <span class="card-tag" style="background: var(--accent-blue-soft); color: var(--accent-blue);">${p.hookType || '최신릴스'}</span>
+              <span class="card-tag" style="background: var(--accent-blue-soft); color: var(--accent-blue);">${escapeHtml(p.hookType || '최신릴스')}</span>
               <span class="media-badge reel">🎬 릴스</span>
+              ${sampleBadge(p)}
             </div>
-            <a href="${p.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();">🔗 원본 릴스 ↗</a>
+            <a href="${escapeHtml(p.url)}" target="_blank" class="origin-link" onclick="event.stopPropagation();">🔗 원본 릴스 ↗</a>
           </div>
-          <div class="card-title" title="${p.caption.replace(/"/g, '&quot;')}">${titleText}</div>
-          <div class="card-snippet">👁️ 조회수 ${p.viewsCount.toLocaleString()}회 · 좋아요 ${p.likesCount.toLocaleString()}개</div>
+          <div class="card-title" title="${escapeHtml(p.caption)}">${escapeHtml(titleText)}</div>
+          <div class="card-snippet">👁️ 조회수 ${views}회 · 좋아요 ${likes}개</div>
         </div>
         <div class="card-footer-meta">
-          <span style="color: var(--accent-orange); font-weight: 700;">❤️ ${p.likesCount.toLocaleString()}</span>
-          <span style="font-size: 11px; color: var(--text-muted);">${p.accountName}</span>
+          <span style="color: var(--accent-orange); font-weight: 700;">❤️ ${likes}</span>
+          <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.accountName)}</span>
         </div>
       </div>
     `;
@@ -511,18 +531,18 @@ function renderTopPicks(picks, counts, policyCount) {
   meta.innerText = `부동산 ${counts.estate || 0} · 시사 ${counts.politics || 0} · 재테크 ${counts.finance || 0}건 중 · 정책 연관 ${policyCount}건`;
 
   container.innerHTML = picks.map((p, idx) => `
-    <div class="top-pick-card" onclick="selectPost('${p.id}', 'estate')">
+    <div class="top-pick-card" onclick="selectPost('${escapeHtml(p.id)}', 'estate')">
       <div class="top-pick-rank">${idx + 1}</div>
       <div class="top-pick-body">
         <div class="top-pick-meta">
-          <span class="top-pick-field field-${p.field}">${p.fieldLabel}</span>
+          <span class="top-pick-field field-${escapeHtml(p.field)}">${escapeHtml(p.fieldLabel)}</span>
           <span class="top-pick-angle">${ANGLE_LABELS[p.suggestedAngle] || '기획형'}</span>
-          <span class="top-pick-score">${p.walletScore}점</span>
+          <span class="top-pick-score">${Number(p.walletScore ?? 0)}점</span>
         </div>
-        <div class="top-pick-title">${p.title}</div>
+        <div class="top-pick-title">${escapeHtml(p.title)}</div>
         <div class="top-pick-sub">
-          <span>${p.relevance || ''} · ${p.press}</span>
-          <a href="${p.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();">원문 ↗</a>
+          <span>${escapeHtml(p.relevance || '')} · ${escapeHtml(p.press)}</span>
+          <a href="${escapeHtml(p.url)}" target="_blank" class="origin-link" onclick="event.stopPropagation();">원문 ↗</a>
         </div>
       </div>
     </div>
@@ -556,23 +576,23 @@ function renderEstateCards(list, targetCat = 'all') {
     const badgeColor = isLossAlert ? '#F87171' : 'var(--accent-orange)';
 
     return `
-      <div class="feed-card" onclick="selectPost('${item.id}', 'estate')" style="border-color: ${item.walletScore >= 60 ? 'rgba(248,113,113,0.35)' : 'var(--border-subtle)'};">
+      <div class="feed-card" onclick="selectPost('${escapeHtml(item.id)}', 'estate')" style="border-color: ${item.walletScore >= 60 ? 'rgba(248,113,113,0.35)' : 'var(--border-subtle)'};">
         <div>
           <div class="card-top-meta">
             <div class="card-top-left">
-              <span class="card-tag" style="${tagStyle}">${item.tag || item.source}</span>
-              <span class="media-badge" style="background: rgba(255, 255, 255, 0.08); color: #E5E7EB;">${item.fieldLabel || '속보'}</span>
+              <span class="card-tag" style="${tagStyle}">${escapeHtml(item.tag || item.source)}</span>
+              <span class="media-badge" style="background: rgba(255, 255, 255, 0.08); color: #E5E7EB;">${escapeHtml(item.fieldLabel || '속보')}</span>
             </div>
-            <a href="${item.url}" target="_blank" class="origin-link" onclick="event.stopPropagation();">🔗 원문 기사 ↗</a>
+            <a href="${escapeHtml(item.url)}" target="_blank" class="origin-link" onclick="event.stopPropagation();">🔗 원문 기사 ↗</a>
           </div>
-          <div class="card-title">${item.title}</div>
-          <div class="card-snippet">${item.summary || ''}</div>
+          <div class="card-title">${escapeHtml(item.title)}</div>
+          <div class="card-snippet">${escapeHtml(item.summary || '')}</div>
         </div>
         <div class="card-footer-meta">
-          <span style="color: ${badgeColor}; font-weight: 700;">${item.relevance || '최신 브리핑'}</span>
+          <span style="color: ${badgeColor}; font-weight: 700;">${escapeHtml(item.relevance || '최신 브리핑')}</span>
           <span style="display:flex; align-items:center; gap:8px;">
             <span style="font-size: 11px; font-weight: 800; color: ${item.walletScore >= 60 ? '#F87171' : 'var(--text-muted)'};">적합도 ${item.walletScore ?? '-'}점</span>
-            <span style="font-size: 11px; color: var(--text-muted);">${item.source}</span>
+            <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(item.source)}</span>
           </span>
         </div>
       </div>
@@ -580,22 +600,22 @@ function renderEstateCards(list, targetCat = 'all') {
   }).join('');
 }
 
-// 4. [탭 4] 릴스 URL 역분석
+// 4. [탭 4] 릴스 URL 역분석 (실제 캡션·지표를 GPT로 분석)
 async function analyzeReelsUrl() {
   if (isGlobalBusy) return;
-  isGlobalBusy = true;
 
   const url = document.getElementById('reels-url-input').value.trim();
-  if (!url) {
-    isGlobalBusy = false;
-    return alert('릴스 URL을 입력해주세요.');
-  }
+  if (!url) return alert('릴스 URL을 입력해주세요.');
 
+  isGlobalBusy = true;
   const btn = document.getElementById('btn-analyze-reels');
   const originalHtml = '<span>🔍</span> 구조 역분석';
+  const resBox = document.getElementById('reels-analysis-result');
+  const content = document.getElementById('reels-analysis-content');
+  const applyBtn = document.getElementById('apply-reels-btn');
 
   btn.disabled = true;
-  btn.innerHTML = '<span>⏳</span> 역분석 중...';
+  btn.innerHTML = '<span>⏳</span> 캡션 수집 & 구조 분석 중...';
 
   try {
     const res = await fetch('/api/analyze-reels', {
@@ -603,48 +623,64 @@ async function analyzeReelsUrl() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
     });
-    const data = await res.json();
-    if (data.success) {
-      const resBox = document.getElementById('reels-analysis-result');
-      const content = document.getElementById('reels-analysis-content');
-      const post = data.postData || {};
-      const actualCaption = post.caption || data.analysis.caption || data.analysis.advice;
-      const authorText = post.author || '@instagram_creator';
-      const statsText = post.viewsCount ? `👁️ 조회수 ${post.viewsCount.toLocaleString()}회 · ❤️ 좋아요 ${post.likesCount.toLocaleString()}개` : '실시간 릴스 분석 완료';
+    const data = await res.json().catch(() => ({ success: false, error: '응답을 읽을 수 없습니다.' }));
+    if (!data.success) throw new Error(data.error || '역분석에 실패했습니다.');
 
-      resBox.style.display = 'flex';
-      content.innerHTML = `
-        <div style="background: rgba(0,0,0,0.25); padding: 10px 14px; border-radius: 8px; margin-bottom: 8px;">
-          <div style="font-size: 12px; color: var(--accent-orange); font-weight: 800;">${authorText} · ${statsText}</div>
-          <div style="font-size: 13px; color: var(--text-main); margin-top: 4px; line-height: 1.4;">${actualCaption.slice(0, 150)}${actualCaption.length > 150 ? '...' : ''}</div>
-        </div>
-        <div><strong>🎯 추출된 1장 후킹 공식:</strong> ${data.analysis.extractedHook}</div>
-        <div><strong>⏱️ 정보 전개 호흡 (Pacing):</strong> ${data.analysis.pacing}</div>
-        <div><strong>💡 재해석 가이드:</strong> ${data.analysis.advice}</div>
-        <div><strong>🔗 원본 릴스:</strong> <a href="${url}" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">${url}</a></div>
-      `;
+    const post = data.postData || {};
+    const analysis = data.analysis || {};
+    const caption = post.caption || '';
+    const authorText = post.author || '@instagram_creator';
+    const hasMetrics = Number.isFinite(post.viewsCount) || Number.isFinite(post.likesCount);
+    const statsText = hasMetrics
+      ? `👁️ 조회수 ${Number(post.viewsCount || 0).toLocaleString()}회 · ❤️ 좋아요 ${Number(post.likesCount || 0).toLocaleString()}개`
+      : '성과 지표 미제공';
+    const tacticsHtml = (analysis.tactics || []).length
+      ? `<ul style="margin: 4px 0 0 18px; padding: 0;">${analysis.tactics.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
+      : '';
 
-      document.getElementById('apply-reels-btn').onclick = () => {
-        const hasImages = post.imageUrls && post.imageUrls.length > 0;
-        const isReelVideo = post.isVideo || (post.videoUrl && !hasImages);
+    resBox.style.display = 'flex';
+    document.getElementById('reels-analysis-title').innerText = '📊 역분석 완료';
+    content.innerHTML = `
+      <div style="background: rgba(0,0,0,0.25); padding: 10px 14px; border-radius: 8px; margin-bottom: 8px;">
+        <div style="font-size: 12px; color: var(--accent-orange); font-weight: 800;">${escapeHtml(authorText)} · ${statsText}</div>
+        <div style="font-size: 13px; color: var(--text-main); margin-top: 4px; line-height: 1.4;">${escapeHtml(caption.slice(0, 150))}${caption.length > 150 ? '...' : ''}</div>
+      </div>
+      <div><strong>🎯 후킹 패턴:</strong> ${escapeHtml(analysis.hookPattern || '추정 불가')}</div>
+      ${analysis.hookText ? `<div><strong>✍️ 실제 후킹 문장:</strong> "${escapeHtml(analysis.hookText)}"</div>` : ''}
+      <div><strong>🧱 전개 구조:</strong> ${escapeHtml(analysis.pacing || '')}</div>
+      ${analysis.whyHot ? `<div><strong>🔥 반응 요인:</strong> ${escapeHtml(analysis.whyHot)}</div>` : ''}
+      ${tacticsHtml ? `<div><strong>🛠️ 재현 포인트:</strong>${tacticsHtml}</div>` : ''}
+      <div><strong>💡 재해석 가이드:</strong> ${escapeHtml(analysis.advice || '')}</div>
+      <div><strong>🧭 추천 관점:</strong> ${ANGLE_LABELS[analysis.recommendedFormula] || '기획형'}</div>
+      <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">※ 캡션과 성과 지표 기반 추정 분석입니다. 영상 속 음성은 분석하지 않습니다.</div>
+      <div><strong>🔗 원본 릴스:</strong> <a href="${escapeHtml(post.url || url)}" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">${escapeHtml(url)}</a></div>
+    `;
 
-        selectedTopicData = {
-          topic: `[인스타 분석] ${actualCaption.slice(0, 30).replace(/\n/g, ' ')}...`,
-          caption: actualCaption,
-          summary: actualCaption.slice(0, 200).replace(/\n/g, ' '),
-          source: `${authorText} (인스타그램)`,
-          url: url,
-          videoUrl: post.videoUrl || (isReelVideo ? url : null),
-          imageUrls: post.imageUrls || [],
-          likesCount: post.likesCount || 0,
-          viewsCount: post.viewsCount || 0,
-          mediaType: isReelVideo ? 'reel' : (hasImages ? 'cardnews' : 'reel')
-        };
-        updateStudioStep1();
+    applyBtn.style.display = 'inline-flex';
+    applyBtn.onclick = () => {
+      if (!caption) return alert('캡션이 없어 스튜디오로 담을 수 없습니다.');
+      const hasImages = post.imageUrls && post.imageUrls.length > 0;
+      const isReelVideo = post.isVideo || (post.videoUrl && !hasImages);
+
+      selectedTopicData = {
+        topic: `[인스타 분석] ${caption.slice(0, 30).replace(/\n/g, ' ')}...`,
+        caption,
+        summary: caption.slice(0, 200).replace(/\n/g, ' '),
+        source: `${authorText} (인스타그램)`,
+        url: post.url || url,
+        videoUrl: post.videoUrl || (isReelVideo ? (post.url || url) : null),
+        imageUrls: post.imageUrls || [],
+        likesCount: post.likesCount ?? null,
+        viewsCount: post.viewsCount ?? null,
+        mediaType: isReelVideo ? 'reel' : (hasImages ? 'cardnews' : 'reel')
       };
-    }
-  } catch (e) {
-    alert('릴스 역분석 실패');
+      updateStudioStep1();
+    };
+  } catch (err) {
+    resBox.style.display = 'flex';
+    applyBtn.style.display = 'none';
+    document.getElementById('reels-analysis-title').innerText = '⚠️ 역분석 실패';
+    content.innerHTML = `<div style="color: #F87171; font-weight: 700; line-height: 1.5;">${escapeHtml(err.message)}</div>`;
   } finally {
     startCooldown(btn, originalHtml, 3);
   }
@@ -840,8 +876,9 @@ window.selectPost = function(id, type) {
         summary: target.summary,
         source: target.source,
         url: target.url,
-        likesCount: 500,
-        viewsCount: 15000,
+        // 뉴스 기사는 좋아요/조회수 지표가 없다. 임의의 숫자를 넣지 않는다.
+        likesCount: null,
+        viewsCount: null,
         mediaType: 'estate',
         walletScore: target.walletScore,
         relevance: target.relevance,
@@ -882,16 +919,16 @@ function updateStudioStep1() {
   selectedTopicBox.innerHTML = `
     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
       <div style="font-weight: 800; font-size: 14px; color: var(--text-main); line-height: 1.3;">
-        ${selectedTopicData.topic}
+        ${escapeHtml(selectedTopicData.topic)}
       </div>
       ${mediaBadgeHtml}
     </div>
     <div style="font-size: 12px; color: var(--text-muted); line-height: 1.4; margin-bottom: 6px;">
-      ${selectedTopicData.summary}
+      ${escapeHtml(selectedTopicData.summary)}
     </div>
     <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding-top: 6px; border-top: 1px dashed var(--border-subtle);">
-      <span style="color: var(--accent-orange); font-weight: 700;">출처: ${selectedTopicData.source}</span>
-      ${selectedTopicData.url ? `<a href="${selectedTopicData.url}" target="_blank" class="origin-link">🔗 원본 보기 ↗</a>` : ''}
+      <span style="color: var(--accent-orange); font-weight: 700;">출처: ${escapeHtml(selectedTopicData.source)}</span>
+      ${selectedTopicData.url ? `<a href="${escapeHtml(selectedTopicData.url)}" target="_blank" class="origin-link">🔗 원본 보기 ↗</a>` : ''}
     </div>
   `;
 
@@ -951,29 +988,32 @@ btnDeepAnalyze.addEventListener('click', async () => {
     deepAnalysisSummary.innerHTML = `
       <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
         <div style="color: #60A5FA; font-weight: 800; margin-bottom: 2px;">1️⃣ 원문 상세 내용 분석:</div>
-        <div style="color: var(--text-main); font-size: 12px; margin-bottom: 4px; line-height: 1.4;">${orig.summary || selectedTopicData.caption}</div>
-        ${orig.keyFacts ? `<div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">${orig.keyFacts.map(f => `• ${f}`).join('<br>')}</div>` : ''}
+        <div style="color: var(--text-main); font-size: 12px; margin-bottom: 4px; line-height: 1.4;">${escapeHtml(orig.summary || selectedTopicData.caption)}</div>
+        ${Array.isArray(orig.keyFacts) ? `<div style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">${orig.keyFacts.map(f => `• ${escapeHtml(f)}`).join('<br>')}</div>` : ''}
       </div>
 
       <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border-subtle);">
         <div style="color: #F87171; font-weight: 800; margin-bottom: 2px;">2️⃣ 원문 떡상 요인 심층 해체:</div>
-        <div style="color: #FCA5A5; font-size: 11px; font-weight: 700;">🎯 핵심 심리 트리거: ${viral.trigger || '손실 회피 & 정보 비대칭'}</div>
-        <div style="color: var(--text-muted); font-size: 11px; margin-top: 2px; line-height: 1.4;">${viral.analysis || ''}</div>
+        <div style="color: #FCA5A5; font-size: 11px; font-weight: 700;">🎯 핵심 심리 트리거: ${escapeHtml(viral.trigger || '손실 회피 & 정보 비대칭')}</div>
+        <div style="color: var(--text-muted); font-size: 11px; margin-top: 2px; line-height: 1.4;">${escapeHtml(viral.analysis || '')}</div>
       </div>
 
       <div>
         <div style="color: #34D399; font-weight: 800; margin-bottom: 2px;">3️⃣ 차별화 업그레이드 접근법:</div>
-        <div style="color: var(--text-muted); font-size: 11px; line-height: 1.4;"><span style="color: #FBBF24; font-weight: 700;">[원본 한계]</span> ${upg.weakness || '단순 텍스트 나열로 가독성 및 소장 가치 부족'}</div>
-        <div style="color: var(--text-main); font-size: 11px; margin-top: 2px; line-height: 1.4;"><span style="color: #34D399; font-weight: 700;">[차별화 전략]</span> ${upg.approach || '정밀 인포그래픽과 3단계 실천 가이드로 저장률 극대화'}</div>
+        <div style="color: var(--text-muted); font-size: 11px; line-height: 1.4;"><span style="color: #FBBF24; font-weight: 700;">[원본 한계]</span> ${escapeHtml(upg.weakness || '단순 텍스트 나열로 가독성 및 소장 가치 부족')}</div>
+        <div style="color: var(--text-main); font-size: 11px; margin-top: 2px; line-height: 1.4;"><span style="color: #34D399; font-weight: 700;">[차별화 전략]</span> ${escapeHtml(upg.approach || '정밀 인포그래픽과 3단계 실천 가이드로 저장률 극대화')}</div>
       </div>
     `;
 
     if (data.audioText) {
       sttTextPreview.style.display = 'block';
-      sttTextPreview.innerHTML = `<strong>🎙️ 릴스 음성 전사 (Whisper STT):</strong><br>${data.audioText}`;
+      sttTextPreview.innerHTML = `<strong>🎙️ 릴스 음성 전사 (Whisper STT):</strong><br><div style="white-space: pre-wrap;">${escapeHtml(data.audioText)}</div>`;
     } else if (data.imageText) {
       sttTextPreview.style.display = 'block';
-      sttTextPreview.innerHTML = `<strong>👁️ 카드 슬라이드 추출 텍스트 (Vision AI):</strong><br><div style="white-space: pre-wrap; font-size: 11px; margin-top: 4px;">${data.imageText}</div>`;
+      sttTextPreview.innerHTML = `<strong>👁️ 카드 슬라이드 추출 텍스트 (Vision AI):</strong><br><div style="white-space: pre-wrap; font-size: 11px; margin-top: 4px;">${escapeHtml(data.imageText)}</div>`;
+    } else if (data.sttError || data.visionError) {
+      sttTextPreview.style.display = 'block';
+      sttTextPreview.innerHTML = `<div style="color: #FBBF24;">⚠️ ${escapeHtml(data.sttError || data.visionError)}</div>`;
     } else {
       sttTextPreview.style.display = 'none';
     }
@@ -1007,31 +1047,31 @@ function renderTop3Angles(top3, criteria, remaining) {
     // 스토리라인 단계별 HTML 포맷팅
     const storylineSteps = (a.storyline || []).map(s => `
       <div class="storyline-step-item">
-        <span class="storyline-step-badge">Slide ${s.slide} (${s.role})</span>
-        <span class="storyline-step-detail">${s.detail}</span>
+        <span class="storyline-step-badge">Slide ${escapeHtml(s.slide)} (${escapeHtml(s.role)})</span>
+        <span class="storyline-step-detail">${escapeHtml(s.detail)}</span>
       </div>
     `).join('');
 
     return `
-      <div class="angle-card ${a.id === selectedAngleId ? 'active' : ''}" data-angle="${a.id}" onclick="selectAngle('${a.id}')" style="border-left: 4px solid var(--accent-orange);">
+      <div class="angle-card ${a.id === selectedAngleId ? 'active' : ''}" data-angle="${escapeHtml(a.id)}" onclick="selectAngle('${escapeHtml(a.id)}')" style="border-left: 4px solid var(--accent-orange);">
         <div class="angle-card-top">
-          <span class="angle-card-title">${a.title}</span>
-          <span class="angle-card-tag" style="${idx === 0 ? 'background: #EF4444;' : 'background: var(--accent-blue);'}">${a.tag}</span>
+          <span class="angle-card-title">${escapeHtml(a.title)}</span>
+          <span class="angle-card-tag" style="${idx === 0 ? 'background: #EF4444;' : 'background: var(--accent-blue);'}">${escapeHtml(a.tag)}</span>
         </div>
         
         <div style="font-size: 11px; color: #FBBF24; line-height: 1.4;">
-          💡 <strong>선발 근거:</strong> ${a.selectionReason}
+          💡 <strong>선발 근거:</strong> ${escapeHtml(a.selectionReason)}
         </div>
 
         <div class="angle-card-hook">
-          🎯 <strong>1장 킬러 카피:</strong> "${a.customHook}"
+          🎯 <strong>1장 킬러 카피:</strong> "${escapeHtml(a.customHook)}"
         </div>
 
-        ${a.approach ? `<div style="font-size: 11px; color: #60A5FA; margin-top: 2px;">⚡ <strong>전개 전략:</strong> ${a.approach}</div>` : ''}
+        ${a.approach ? `<div style="font-size: 11px; color: #60A5FA; margin-top: 2px;">⚡ <strong>전개 전략:</strong> ${escapeHtml(a.approach)}</div>` : ''}
 
         <div style="font-size: 11px; font-weight: 700; color: var(--text-main); margin-top: 4px;">📋 카드별 상세 전개 시나리오:</div>
         <div class="angle-storyline-container">
-          ${storylineSteps || `<div style="color: var(--text-muted); font-size: 11px;">${a.plot || '단계별 전개 시나리오 준비 완료'}</div>`}
+          ${storylineSteps || `<div style="color: var(--text-muted); font-size: 11px;">${escapeHtml(a.plot || '단계별 전개 시나리오 준비 완료')}</div>`}
         </div>
       </div>
     `;
@@ -1039,7 +1079,7 @@ function renderTop3Angles(top3, criteria, remaining) {
 
   anglesGrid.innerHTML = `
     <div style="font-size: 12px; color: var(--text-main); margin-bottom: 10px; padding: 8px 12px; background: rgba(217, 83, 47, 0.1); border: 1px solid var(--border-subtle); border-radius: 6px;">
-      🎯 <strong>7대 관점 중 엄선 기준:</strong> ${criteria || '투자자의 손실 불안 해소 및 인스타그램 실전 저장/공유 잠재력 극대화'}
+      🎯 <strong>7대 관점 중 엄선 기준:</strong> ${escapeHtml(criteria || '투자자의 손실 불안 해소 및 인스타그램 실전 저장/공유 잠재력 극대화')}
     </div>
     ${top3Html}
   `;
@@ -1093,10 +1133,10 @@ btnGenerateScript.addEventListener('click', async () => {
     
     scriptPreviewContent.innerHTML = generatedCardScript.slides.map(s => `
       <div class="script-slide-item">
-        <strong>[${s.slide_number}/${s.total_slides}장 ${s.type.toUpperCase()}]</strong>
-        ${s.type === 'cover' ? ` ${s.headline_prefix} <span style="color: var(--accent-orange); font-weight: 800;">${s.headline_highlight}</span> ${s.headline_suffix}` : ''}
-        ${s.type === 'body_list' || s.type === 'body_visual' ? ` <strong>${s.title}</strong><br><small style="color: var(--text-muted);">${(s.points || []).map(p => `• ${p.heading}: ${p.desc}`).join('<br>')}</small>` : ''}
-        ${s.type === 'cta' ? ` <strong>${s.summary_title}</strong>: ${(s.summary_items || []).join(' / ')}` : ''}
+        <strong>[${escapeHtml(s.slide_number)}/${escapeHtml(s.total_slides)}장 ${escapeHtml(String(s.type || '').toUpperCase())}]</strong>
+        ${s.type === 'cover' ? ` ${escapeHtml(s.headline_prefix)} <span style="color: var(--accent-orange); font-weight: 800;">${escapeHtml(s.headline_highlight)}</span> ${escapeHtml(s.headline_suffix)}` : ''}
+        ${s.type === 'body_list' || s.type === 'body_visual' ? ` <strong>${escapeHtml(s.title)}</strong><br><small style="color: var(--text-muted);">${(s.points || []).map(p => `• ${escapeHtml(p.heading)}: ${escapeHtml(p.desc)}`).join('<br>')}</small>` : ''}
+        ${s.type === 'cta' ? ` <strong>${escapeHtml(s.summary_title)}</strong>: ${(s.summary_items || []).map(escapeHtml).join(' / ')}` : ''}
       </div>
     `).join('');
 
@@ -1138,7 +1178,7 @@ async function requestSaveReport() {
   resultZone.style.display = 'flex';
   savedFolderBadge.innerText = saveData.folderName;
   savedFilePath.innerHTML = `
-    <div><strong>📄 생성된 리포트:</strong> <code style="background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 4px; color: #6EE7B7; font-weight: 700;">${saveData.reportPath}</code></div>
+    <div><strong>📄 생성된 리포트:</strong> <code style="background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 4px; color: #6EE7B7; font-weight: 700;">${escapeHtml(saveData.reportPath)}</code></div>
   `;
   reportMarkdownPreview.innerText = saveData.markdownSummary;
   return saveData;
@@ -1181,16 +1221,25 @@ async function renderCardsToFolder(folder) {
   });
   const renderData = await renderRes.json();
   if (!renderData.success) throw new Error(renderData.error || '렌더링 실패');
+  if (Array.isArray(renderData.warnings) && renderData.warnings.length > 0) {
+    console.warn(`[렌더] 웹폰트 로드 실패: ${renderData.warnings.join(', ')} — 대체 폰트로 렌더링되었습니다.`);
+  }
 
   cardsGallery.style.display = 'grid';
-  cardsGallery.innerHTML = renderData.images.map((src, i) => `
-    <a class="card-thumb" href="${src}" target="_blank">
-      <img src="${src}" alt="카드뉴스 ${i + 1}장">
-      <span>${String(i + 1).padStart(2, '0')}장 · 원본 열기 ↗</span>
-    </a>
-  `).join('');
+    cardsGallery.innerHTML = renderData.images.map((src, i) => `
+      <a class="card-thumb" href="${escapeHtml(src)}" target="_blank">
+        <img src="${escapeHtml(src)}" alt="카드뉴스 ${i + 1}장">
+        <span>${String(i + 1).padStart(2, '0')}장 · 원본 열기 ↗</span>
+      </a>
+    `).join('');
 
   return renderData;
+}
+
+function fontWarningNote(renderData) {
+  return Array.isArray(renderData?.warnings) && renderData.warnings.length
+    ? `\n⚠️ 웹폰트 로드 실패: ${renderData.warnings.join(', ')} (대체 폰트로 렌더링됨)`
+    : '';
 }
 
 // 5-1. AI 슬라이드 이미지 생성 → 카드에 반영
@@ -1224,15 +1273,15 @@ btnGenerateImages.addEventListener('click', async () => {
 
     imagesPreview.style.display = 'grid';
     imagesPreview.innerHTML = data.generated.map(g => `
-      <a class="card-thumb" href="${g.path}" target="_blank">
-        <img src="${g.path}" alt="슬라이드 ${g.slide_number} 이미지">
+      <a class="card-thumb" href="${escapeHtml(g.path)}" target="_blank">
+        <img src="${escapeHtml(g.path)}" alt="슬라이드 ${escapeHtml(g.slide_number)} 이미지">
         <span>이미지 ${String(g.slide_number).padStart(2, '0')} · 카드 반영</span>
       </a>
     `).join('');
 
     const renderData = await renderCardsToFolder(folder);
     const errNote = data.errors?.length ? `\n(실패 ${data.errors.length}장: ${data.errors[0].error})` : '';
-    alert(`🎉 이미지 ${data.generated.length}장 생성 → 카드 ${renderData.images.length}장에 반영 완료!${errNote}`);
+    alert(`🎉 이미지 ${data.generated.length}장 생성 → 카드 ${renderData.images.length}장에 반영 완료!${errNote}${fontWarningNote(renderData)}`);
   } catch (err) {
     console.error('이미지 생성 오류:', err);
     alert(`이미지 생성 실패: ${err.message}`);
@@ -1246,14 +1295,14 @@ btnRenderCards.addEventListener('click', async () => {
   if (!generatedCardScript || !selectedTopicData || isGlobalBusy) return;
   isGlobalBusy = true;
 
-  const originalHtml = '<span>🎨</span> 카드뉴스 PNG 4장 생성 (1080x1350)';
+  const originalHtml = '<span>🎨</span> 카드뉴스 PNG 생성 (1080x1350)';
   btnRenderCards.disabled = true;
   btnRenderCards.innerHTML = '<span>⏳</span> 1080x1350 PNG 렌더링 중...';
 
   try {
     const folder = await ensureReportFolder();
     const renderData = await renderCardsToFolder(folder);
-    alert(`🎉 카드뉴스 ${renderData.images.length}장 생성 완료!\noutputs/${renderData.folder}/cards/`);
+    alert(`🎉 카드뉴스 ${renderData.images.length}장 생성 완료!\noutputs/${renderData.folder}/cards/${fontWarningNote(renderData)}`);
   } catch (err) {
     console.error('카드 렌더링 오류:', err);
     alert(`카드 생성 실패: ${err.message}`);

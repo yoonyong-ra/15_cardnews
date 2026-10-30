@@ -1,5 +1,6 @@
 require('dotenv').config();
 const OpenAI = require('openai');
+const { callChatCompletion } = require('./llm_client');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -15,7 +16,23 @@ function getOpenAIClient() {
 
 /**
  * 1. 릴스 영상 오디오 다운로드 & OpenAI Whisper STT 전사
+ *
+ * Whisper 업로드 한도는 25MB다. 초과 영상은 다운로드 중간에 중단하고
+ * 조용히 실패하지 않고 사유를 돌려준다(분석 자체는 캡션 기반으로 계속 진행).
  */
+const WHISPER_MAX_BYTES = 25 * 1024 * 1024;
+const VIDEO_DOWNLOAD_TIMEOUT_MS = 30000;
+
+function tooLargeResult(bytes) {
+  const mb = (bytes / 1024 / 1024).toFixed(1);
+  return {
+    success: false,
+    text: null,
+    reason: 'too_large',
+    message: `영상 용량이 ${mb}MB로 Whisper 업로드 한도(25MB)를 넘어 음성 전사를 건너뜁니다. 캡션·이미지 기반으로 분석을 계속합니다.`
+  };
+}
+
 async function transcribeReelsAudio(videoUrl) {
   const openai = getOpenAIClient();
   if (!openai) {
@@ -23,12 +40,13 @@ async function transcribeReelsAudio(videoUrl) {
     return {
       success: false,
       text: null,
+      reason: 'no_key',
       message: '.env 파일에 OPENAI_API_KEY를 입력해주세요.'
     };
   }
 
   if (!videoUrl) {
-    return { success: false, text: null, message: '영상 URL이 제공되지 않았습니다.' };
+    return { success: false, text: null, reason: 'no_url', message: '영상 URL이 제공되지 않았습니다.' };
   }
 
   const tempFilePath = path.join(os.tmpdir(), `reels_${Date.now()}.mp4`);
@@ -39,39 +57,71 @@ async function transcribeReelsAudio(videoUrl) {
       url: videoUrl,
       method: 'GET',
       responseType: 'stream',
-      timeout: 30000
+      timeout: VIDEO_DOWNLOAD_TIMEOUT_MS,
+      maxRedirects: 5
     });
+
+    const declaredLength = Number(response.headers?.['content-length']);
+    if (Number.isFinite(declaredLength) && declaredLength > WHISPER_MAX_BYTES) {
+      response.data.destroy?.();
+      console.warn(`[STT] 용량 초과(${declaredLength} bytes) → 전사 생략`);
+      return tooLargeResult(declaredLength);
+    }
 
     const writer = fs.createWriteStream(tempFilePath);
-    response.data.pipe(writer);
+    let downloaded = 0;
 
     await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
+      const onData = chunk => {
+        downloaded += chunk.length;
+        if (downloaded > WHISPER_MAX_BYTES) {
+          response.data.destroy?.();
+          writer.destroy();
+          const err = new Error('video too large for whisper');
+          err.code = 'TOO_LARGE';
+          reject(err);
+        }
+      };
+      response.data.on('data', onData);
+      response.data.on('error', reject);
       writer.on('error', reject);
+      writer.on('finish', resolve);
+      response.data.pipe(writer);
     });
 
-    console.log(`[STT] 다운로드 완료, Whisper API 호출 중...`);
+    const stat = fs.statSync(tempFilePath);
+    if (stat.size > WHISPER_MAX_BYTES) {
+      console.warn(`[STT] 용량 초과(${stat.size} bytes) → 전사 생략`);
+      return tooLargeResult(stat.size);
+    }
+
+    console.log(`[STT] 다운로드 완료(${(stat.size / 1024 / 1024).toFixed(1)}MB), Whisper API 호출 중...`);
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(tempFilePath),
       model: 'whisper-1',
       language: 'ko'
-    });
+    }, { timeout: 120000 });
 
-    console.log(`[STT] 음성 전사 완료! 내용: ${transcription.text.slice(0, 80)}...`);
+    console.log(`[STT] 음성 전사 완료! 내용: ${String(transcription.text || '').slice(0, 80)}...`);
     return {
       success: true,
       text: transcription.text
     };
   } catch (err) {
+    if (err.code === 'TOO_LARGE') {
+      console.warn('[STT] 용량 초과 → 전사 생략');
+      return tooLargeResult(WHISPER_MAX_BYTES);
+    }
     console.error(`[STT 오류]`, err.message);
     return {
       success: false,
       text: null,
+      reason: 'error',
       message: `음성 전사 실패: ${err.message}`
     };
   } finally {
     if (fs.existsSync(tempFilePath)) {
-      try { fs.unlinkSync(tempFilePath); } catch (e) {}
+      try { fs.unlinkSync(tempFilePath); } catch (e) { /* 무시 */ }
     }
   }
 }
@@ -120,11 +170,11 @@ async function analyzeCardImages(imageUrls = []) {
     }
 
     console.log(`[Vision] ${contentPayload.length - 1}장 이미지 GPT-4o-mini Vision 분석 호출 중...`);
-    const response = await openai.chat.completions.create({
+    const response = await callChatCompletion(openai, {
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: contentPayload }],
       max_tokens: 1500
-    });
+    }, { timeout: 120000, retries: 1, label: 'Vision 분석' });
 
     const extractedText = response.choices[0]?.message?.content || "";
     console.log(`[Vision] 카드뉴스 이미지 텍스트 추출 완료! (글자 수: ${extractedText.length}자)`);
@@ -146,7 +196,9 @@ async function generateMultimodalInsight({ topic, caption, audioText, imageText,
 [인스타 원문 캡션]: ${caption || '(캡션 없음)'}
 [릴스 음성 전사본 (Whisper STT)]: ${audioText || '(음성 텍스트 없음)'}
 [카드뉴스 이미지 추출 텍스트 (Vision)]: ${imageText || '(이미지 분석 없음)'}
-[성과 지표]: 좋아요 ${metrics.likesCount || 0}개, 조회수 ${metrics.viewsCount || 0}회
+[성과 지표]: ${Number.isFinite(metrics.likesCount) || Number.isFinite(metrics.viewsCount)
+  ? `좋아요 ${metrics.likesCount || 0}개, 조회수 ${metrics.viewsCount || 0}회`
+  : '제공되지 않음 (뉴스 기사 등 성과 지표가 없는 소재)'}
 `.trim();
 
   // 7대 관점 기본 메타
@@ -267,11 +319,11 @@ ${fullContext}
 }
 `;
 
-      const response = await openai.chat.completions.create({
+      const response = await callChatCompletion(openai, {
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" }
-      });
+      }, { timeout: 90000, retries: 1, label: '멀티모달 분석' });
 
       const parsed = JSON.parse(response.choices[0]?.message?.content || "{}");
       return {
