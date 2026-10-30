@@ -1,0 +1,114 @@
+{
+  "planHash": "d2775fc0e9af4dbbfcd5ff066621c236b7014f4c0060c1cd6e24268dda6882c6",
+  "phase": "baseline",
+  "recordedAtUtc": "2026-10-30T04:56:13.5463239Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 60885,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "settings-endpoint-200",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n{\u0022success\u0022:true,\u0022settings\u0022:{\u0022selectedAngleId\u0022:\u0022angle_warning\u0022,\u0022userFeedback\u0022:\u0022\u0022,\u0022slideCount\u0022:\u00224\u0022,\u0022theme\u0022:{\u0022bg\u0022:\u0022#F7F5F0\u0022,\u0022title\u0022:\u0022#191A1E\u0022,\u0022accent\u0022:\u0022#D9532F\u0022}},\u0022exists\u0022:true}\n--- server output ---\n\r\n\u003E instagram-cardnews-studio@1.0.0 start\r\n\u003E node server.js\r\n\r\n\u25C7 injected env (2) from .env\r\n\u25C7 injected env (0) from .env\r\n\uD83D\uDE80 [\uC11C\uBC84] \uC5C5\uB370\uC774\uD2B8 \uC644\uB8CC: http://localhost:3300\r\n",
+        "durationMs": 1067
+      },
+      {
+        "name": "home-page-200",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n\u003C!DOCTYPE html\u003E\r\n\u003Chtml lang=\u0022ko\u0022\u003E\r\n\u003Chead\u003E\r\n  \u003Cmeta charset=\u0022UTF-8\u0022\u003E\r\n  \u003Cmeta name=\u0022viewport\u0022 content=\u0022width=device-width, initial-scale=1.0\u0022\u003E\r\n  \u003Ctitle\u003E2839 CardNews Studio \u2014 \uBD80\uB3D9\uC0B0 \u00B7 \uC2DC\uC0AC \u00B7 \uC7AC\uD14C\uD06C \uC190\uC2E4\uD68C\uD53C \uCE74\uB4DC\uB274\uC2A4 \uC2A4\uD29C\uB514\uC624\u003C/title\u003E\r\n  \u003Clink rel=\u0022stylesheet\u0022 href=\u0022style.css\u0022\u003E\r\n\u003C/head\u003E\r\n\u003Cbody\u003E\r\n\r\n  \u003C!-- Top Navigation Header --\u003E\r\n  \u003Cheader class=\u0022app-header\u0022\u003E\r\n    \u003Cdiv class=\u0022logo-area\u0022 style=\u0022display: flex; align-items: center; gap: 10px;\u0022\u003E\r\n      \u003Cdiv class=\u0022logo-badge\u0022\u003E\r\n        \u003Cimg src=\u0022/logo.png\u0022 alt=\u0022\uB0A8\uB2E4\uB978AI Logo\u0022\u003E\r\n      \u003C/div\u003E\r\n      \u003Cdiv class=\u0022logo-title\u0022 style=\u0022display: flex; align-items: baseline; gap: 8px;\u0022\u003E\r\n        \u003Cspan class=\u0022title-white\u0022\u003E2839\u003C/span\u003E\r\n        \u003Cspan class=\u0022title-orange\u0022\u003ESTUDIO\u003C/span\u003E\r\n        \u003Cspan class=\u0022made-by-badge\u0022 style=\u0022font-size: 11px; font-weight: 600; color: #9CA3AF; background: rgba(255, 255, 255, 0.06); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.1); letter-spacing: -0.01em;\u0022\u003E\uBD80\uB3D9\uC0B0 \u00B7 \uC2DC\uC0AC \u00B7 \uC7AC\uD14C\uD06C\u003C/span\u003E\r\n      \u003C/div\u003E\r\n    \u003C/div\u003E\r\n    \u003Cdiv style=\u0022font-size: 13px; color: var(--text-muted);\u0022\u003E\r\n      2839 \uC138\uB300 \uC790\uC0B0\u00B7\uAD8C\uB9AC \uC190\uC2E4\uD68C\uD53C \uD2B9\uD654 \uD540\uD130\uB808\uC2A4\uD2B8 \uCE74\uB4DC\uB274\uC2A4 \uC790\uB3D9 \uC81C\uC791\uAE30\r\n    \u003C/div\u003E\r\n  \u003C/header\u003E\r\n\r\n  \u003C!-- Main Container --\u003E\r\n  \u003Cdiv class=\u0022app-container\u0022\u003E\r\n\r\n    \u003C!-- Left Main: Feed Tabs \u0026 Tools --\u003E\r\n    \u003Cmain class=\u0022main-content\u0022\u003E\r\n      \u003Cnav class=\u0022tab-bar\u0022\u003E\r\n        \u003Cbutton class=\u0022tab-btn active\u0022 data-tab=\u0022tab-topic\u0022\u003E\uD83D\uDD25 1. 3\uB300 \uBD84\uC57C \uD56B\uD2B8\uB80C\uB4DC (\uBCA0\uC2A4\uD2B8 5\uD53D)\u003C/button\u003E\r\n        \u003Cbutton class=\u0022tab-btn\u0022 data-tab=\u0022tab-account\u0022\u003E\uD83D\uDC65 2. \uD2B9\uC815 \uB9B4\uC2A4 \uACC4\uC815 \uC804\uC218 \uC218\uC9D1\u003C/button\u003E\r\n        \u003Cbutton class=\u0022tab-btn\u0022 data-tab=\u0022tab-estate\u0022\u003E\uD83D\uDCF0 3. \uC2E4\uC2DC\uAC04 \uB274\uC2A4 (\uBD80\uB3D9\uC0B0\u00B7\uC2DC\uC0AC\u00B7\uC7AC\uD14C\uD06C)\u003C/button\u003E\r\n        \u003Cbutton class=\u0022tab-btn\u0022 data-tab=\u0022tab-reels\u0022\u003E\uD83D\uDD0D 4. \uB9B4\uC2A4 URL \uB5A1\uC0C1 \uC5ED\uBD84\uC11D\u003C/button\u003E\r\n      \u003C/nav\u003E\r\n\r\n      \u003C!-- TAB 1: Topic-based Instagram Trends (20 Posts \u002B Best 5 Highlighting) --\u003E\r\n      \u003Csection class=\u0022tab-content\u0022 id=\u0022tab-topic\u0022\u003E\r\n        \u003Cdiv class=\u0022control-panel\u0022\u003E\r\n          \u003Cdiv style=\u0022font-weight: 700; font-size: 14px; color: var(--text-main); margin-bottom: 8px;\u0022\u003E\r\n            \uD83D\uDD0D 2839 \uC190\uC2E4\uD68C\uD53C \uCD94\uCC9C \uD0A4\uC6CC\uB4DC (\uD074\uB9AD \uC2DC \uC790\uB3D9 \uC785\uB825)\r\n          \u003C/div\u003E\r\n          \r\n          \u003C!-- Category Keyword Chips --\u003E\r\n          \u003Cdiv class=\u0022quick-presets-container\u0022 style=\u0022display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 12px;\u0022\u003E\r\n            \u003Cdiv style=\u0022display: flex; align-items: center; gap: 6px; flex-wrap: wrap;\u0022\u003E\r\n              \u003Cspan style=\u0022font-weight: 800; color: #60A5FA; min-width: 65px;\u0022\u003E\uD83C\uDFE0 \uBD80\uB3D9\uC0B0:\u003C/span\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uCCAD\uC57D\u0022\u003E#\uCCAD\uC57D\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uBD80\uB3D9\uC0B0\u0022\u003E#\uBD80\uB3D9\uC0B0\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uC804\uC138\uC0AC\uAE30\u0022\u003E#\uC804\uC138\uC0AC\uAE30\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uB0B4\uC9D1\uB9C8\uB828\u0022\u003E#\uB0B4\uC9D1\uB9C8\uB828\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022DSR\uB300\uCD9C\u0022\u003E#DSR\uB300\uCD9C\u003C/button\u003E\r\n            \u003C/div\u003E\r\n            \u003Cdiv style=\u0022display: flex; align-items: center; gap: 6px; flex-wrap: wrap;\u0022\u003E\r\n              \u003Cspan style=\u0022font-weight: 800; color: #34D399; min-width: 65px;\u0022\u003E\uD83D\uDCB0 \uC7AC\uD14C\uD06C:\u003C/span\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uC808\uC138\u0022\u003E#\uC808\uC138\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uC5F0\uB9D0\uC815\uC0B0\u0022\u003E#\uC5F0\uB9D0\uC815\uC0B0\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uD30C\uD0B9\uD1B5\uC7A5\u0022\u003E#\uD30C\uD0B9\uD1B5\uC7A5\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022ISA\uACC4\uC88C\u0022\u003E#ISA\uACC4\uC88C\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uC228\uC740\uB3C8\uCC3E\uAE30\u0022\u003E#\uC228\uC740\uB3C8\uCC3E\uAE30\u003C/button\u003E\r\n            \u003C/div\u003E\r\n            \u003Cdiv style=\u0022display: flex; align-items: center; gap: 6px; flex-wrap: wrap;\u0022\u003E\r\n              \u003Cspan style=\u0022font-weight: 800; color: #F87171; min-width: 65px;\u0022\u003E\uD83C\uDFDB\uFE0F \uC2DC\uC0AC:\u003C/span\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uC138\uC81C\uAC1C\uD3B8\u0022\u003E#\uC138\uC81C\uAC1C\uD3B8\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uBD80\uB3D9\uC0B0\uC815\uCC45\u0022\u003E#\uBD80\uB3D9\uC0B0\uC815\uCC45\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-tag-btn\u0022 data-keyword=\u0022\uC5F0\uAE08\uAC1C\uD601\u0022\u003E#\uC5F0\uAE08\uAC1C\uD601\u003C/button\u003E\r\n              \u003Cbutton type=\u0022button\u0022 class=\u0022preset-\n\u2026[truncated]",
+        "durationMs": 20
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E instagram-cardnews-studio@1.0.0 test\r\n\u003E node scripts/test_collectors.js\r\n\r\n\u2705 \uC815\uCC45/\uC138\uAE08 \uAE30\uC0AC \uACE0\uB4DD\uC810\r\n\u2705 \uC0AC\uAC74\uC0AC\uACE0/\uCD94\uBAA8 \uAE30\uC0AC \uB178\uC774\uC988 \uCC98\uB9AC\r\n\u2705 \uC815\uD30C \uD504\uB808\uC784 \uAE30\uC0AC \uAC10\uC810\r\n\u2705 \uC911\uBCF5 \uAE30\uC0AC \uAC10\uC9C0\r\n\u2705 \uD0DC\uADF8\u00B7\uAD00\uC810 \uCD94\uCC9C\r\n\r\n5\uAC1C \uD14C\uC2A4\uD2B8 \uD1B5\uACFC\r\n",
+        "durationMs": 793,
+        "testResults": {
+          "testFramework": "unknown",
+          "runnerDetectedFrom": "none",
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": true
+        }
+      }
+    ],
+    "executions": [
+      {
+        "source": "setup[0]",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "ci"
+        ],
+        "cwd": "C:\\Projects\\15_cardnews",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "settings-endpoint-200",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "start"
+        ],
+        "cwd": "C:\\Projects\\15_cardnews",
+        "env": {
+          "PORT": "3300",
+          "NODE_ENV": "test"
+        },
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "home-page-200",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "start"
+        ],
+        "cwd": "C:\\Projects\\15_cardnews",
+        "env": {
+          "PORT": "3300",
+          "NODE_ENV": "test"
+        },
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "test"
+        ],
+        "cwd": "C:\\Projects\\15_cardnews",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}
