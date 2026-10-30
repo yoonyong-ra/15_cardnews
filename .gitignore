@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-package-lock.json
 
 # Environment Variables (민감정보 보호)
 .env
@@ -29,3 +28,7 @@ assets/dashboard_*.png
 data/
 tmp/
 scratch/
+
+# Migration 툴 산출물 (커밋 제외)
+.github/modernize/
+.tsupgrader/

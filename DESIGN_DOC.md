@@ -1,5 +1,7 @@
 # 📌 Design Document: 인스타 트렌드 분석 & 핀터레스트풍 카드뉴스 자동화 시스템
 
+> ⚠️ **문서 상태:** 이 문서는 2026-09-21 최초 기획 시점의 설계안입니다. 현재 구현 기준의 단일 소스는 [README.md](README.md)이며, 이미지 생성은 Antigravity가 아니라 OpenAI Images API로 동작합니다. (5대 공식 → 7대 관점, 6~8장 → 4~10장 가변)
+
 - **작성일자:** 2026-09-21
 - **모드:** Builder Mode (YC Office Hours)
 - **상태:** 확정 (Approved - Approach A)

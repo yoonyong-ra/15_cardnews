@@ -1,6 +1,6 @@
 # ⚡ 2839 CardNews Studio (부동산 · 시사 · 재테크 손실회피 스튜디오)
 
-> **2839 세대(28~39세 수도권 월급쟁이·가구주)의 자산(부동산·재테크)과 권리(시사·정책) '손실 회피(Loss Aversion)' 심리를 타깃팅하여, 인스타 핫트렌드와 실시간 뉴스를 멀티모달(Whisper STT / GPT-4o Vision)로 분석하고 핀터레스트풍 1080x1350 카드뉴스를 자동 제작하는 AI 스튜디오**
+> **2839 세대(28~39세 수도권 월급쟁이·가구주)의 자산(부동산·재테크)과 권리(시사·정책) '손실 회피(Loss Aversion)' 심리를 타깃팅하여, 인스타 핫트렌드와 실시간 뉴스를 멀티모달(Whisper STT / GPT-4o-mini Vision)로 분석하고 핀터레스트풍 1080x1350 카드뉴스를 자동 제작하는 AI 스튜디오**
 
 ---
 
@@ -35,7 +35,7 @@ graph TD
     A[인스타그램 / 네이버 뉴스] --> B[Apify & Cheerio 수집기]
     B --> C{미디어 유형 판별}
     C -->|릴스 비디오| D[OpenAI Whisper STT 전사]
-    C -->|카드뉴스 이미지| E[GPT-4o Vision AI OCR]
+    C -->|카드뉴스 이미지| E[GPT-4o-mini Vision AI OCR]
     C -->|기사 및 캡션| F[텍스트 메타데이터 파싱]
     D --> G[멀티모달 딥분석 엔진]
     E --> G
@@ -43,7 +43,7 @@ graph TD
     G --> H[4대 심층 분석 & 7대 관점 TOP 3 추천]
     H --> I[AI 슬라이드 대본 생성 & report.md 저장]
     I --> J[/cardnews-creator 스킬]
-    J --> K[Antigravity AI 슬라이드별 맞춤 이미지 생성]
+    J --> K[OpenAI 이미지 생성 (표지·비주얼)]
     K --> L[Playwright 무손실 1080x1350 PNG 렌더링]
     L --> M[최종 카드뉴스 세트 완성]
 ```
@@ -60,9 +60,23 @@ npx playwright install chromium
 
 ### 1-1. 테스트 실행
 ```bash
-npm test                 # 분류·중복제거·스코어링 단위 테스트
+npm test                 # 수집기·대본검증·LLM재시도·렌더러 단위 테스트
+npm run smoke            # 실제 PNG 렌더 스모크 테스트 (API 키 불필요, Chromium 필요)
 LIVE_TEST=1 npm test     # 네이버 실시간 수집까지 포함
 ```
+
+### 1-2. 생성된 대본을 CLI로 다시 렌더링
+```bash
+npm run render -- 261029_1325     # outputs/261029_1325/script.json → cards/slide_XX.png
+```
+서버(`/api/render`)와 동일한 `engine/card_renderer.js`를 사용하므로 결과물이 같습니다.
+
+### 1-3. outputs 보존 정책
+```bash
+npm run clean:outputs -- --days 7            # 7일 지난 폴더 미리보기 (기본 dry-run)
+npm run clean:outputs -- --days 7 --apply    # 실제 삭제
+```
+`--keep 3` 을 주면 최근 3개 폴더는 나이와 무관하게 보존합니다.
 
 ### 2. 환경변수 설정 (`.env`)
 프로젝트 루트 경로에 `.env` 파일을 생성하고 API 키를 입력합니다:
@@ -102,7 +116,7 @@ npm start
 [4. Step 4: 종합 리포트 저장 & 카드뉴스 PNG 생성]
    • [자료수집 완료 및 종합 리포트 저장] 클릭 → `outputs/YYMMDD_HHMM/report.md` 저장
    • [AI 슬라이드 이미지 생성 (표지·비주얼)] 클릭 → `assets/slide_01.png` 생성 후 카드에 자동 반영 (OpenAI 크레딧 사용, 확인창 있음)
-   • [카드뉴스 PNG 4장 생성 (1080x1350)] 클릭 → `outputs/YYMMDD_HHMM/cards/slide_01.png ~`
+   • [카드뉴스 PNG 생성 (1080x1350)] 클릭 → `outputs/YYMMDD_HHMM/cards/slide_01.png ~`
    • 렌더 전 **🎨 카드 색상**에서 배경색·타이틀색·강조색을 지정 (프리셋 4종)
    • 선택한 관점·피드백·슬라이드 장수·색상은 `data/user_settings.json`에 저장되어 다음 실행 시 기본값으로 복원
    • 이미지가 없으면 타이포그래피 플레이스홀더로 렌더링됨 (리스트형 본문은 디자인상 사진 영역 없음)
@@ -150,7 +164,7 @@ npm start
 │   └── estate_collector.js           # 네이버 실시간 뉴스 수집기
 ├── engine/                           # AI 기획 및 분석 엔진
 │   ├── analyzer.js                   # 7대 관점 기반 고급 대본 생성기
-│   └── multimodal_analyzer.js        # Whisper STT & GPT-4o Vision 분석기
+│   └── multimodal_analyzer.js        # Whisper STT & GPT-4o-mini Vision 분석기 (engine/)
 ├── outputs/                          # 생성된 리포트 및 카드뉴스 저장 폴더
 │   └── YYMMDD_HHMM/
 │       ├── report.md                 # 기획 리포트 마크다운
@@ -160,7 +174,9 @@ npm start
 │   ├── index.html
 │   ├── style.css
 │   └── app.js
-├── scripts/                          # Playwright 렌더링 스크립트
+├── scripts/                          # 렌더 CLI 및 단위 테스트
+│   ├── render_cards.js               # outputs/<폴더>/script.json → PNG (서버와 동일 렌더러)
+│   └── test_*.js                     # 수집기·검증·LLM·렌더러 테스트
 ├── templates/                        # 카드뉴스 HTML 템플릿
 ├── DESIGN.md                         # 핀터레스트 카드뉴스 디자인 시스템 명세서
 ├── DESIGN_DOC.md                     # 시스템 아키텍처 상세 설계서
